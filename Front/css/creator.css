@@ -159,3 +159,5 @@ footer{color:#7589ac;text-align:center;font-size:10px;padding:0 0 22px}
 .roster-avatar{width:38px}
 .roster-color{display:none}
 }
+.qr-box{display:grid;place-items:center;background:#fff;border-radius:14px;padding:14px;margin:14px auto;width:fit-content}
+.qr-box img{display:block;max-width:100%;height:auto}
