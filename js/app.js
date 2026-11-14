@@ -43,7 +43,13 @@ function previewMarkup(){
     <div class="preview-details"><div><strong>${escapeText(name||'Tu nueva mascota')}</strong><p>${chosen?`${labelFor(state)} · ${chosen.name}`:'Esperando selección'}</p></div>${chosen?'<span class="green-check">Personalizando</span>':'<span class="pill">A TU GUSTO</span>'}</div>`;
 }
 function renderPreview(){previewRegion.innerHTML=previewMarkup()}
-function header(title,subtitle,stepCount=1){return `<div class="head-row"><div><h2>${title}</h2><p>${subtitle}</p></div><div class="step-dots"><i class="active"></i><i class="${stepCount>=2?'active':''}"></i><i class="${stepCount>=3?'active':''}"></i></div></div>`}
+function actionContent(label,icon='arrow',detail=''){
+  const paths={arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',qr:'<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M15 15h3v3h3m-6 3h3m3-6v-3"/>',check:'<path d="m5 12 4 4L19 6"/>',plus:'<path d="M12 5v14M5 12h14"/>'};
+  return `<span class="button-label">${escapeText(label)}${detail?`<small>${escapeText(detail)}</small>`:''}</span><span class="button-icon button-trailing" aria-hidden="true"><svg viewBox="0 0 24 24">${paths[icon]||paths.arrow}</svg></span>`;
+}
+function header(title,subtitle,stepCount=1){
+  return `<div class="head-row"><div><h2>${title}</h2><p>${subtitle}</p></div><ol class="creation-steps" aria-label="Progreso de creación">${['Diseña','Revisa','Paga'].map((label,i)=>`<li ${i+1===stepCount?'aria-current="step"':''} class="${i+1<stepCount?'is-complete':''}"><span class="step-number" aria-hidden="true">${i+1<stepCount?'✓':i+1}</span>${label}</li>`).join('')}</ol></div>`;
+}
 function renderCreate(){
   const full=readRoster().length>=MAX_PETS;
   const complete=!!state.species&&!!state.breed&&!full;
@@ -52,11 +58,11 @@ function renderCreate(){
       ${[['perro','🐶','Perro','Amigo fiel'],['gato','🐱','Gato','Espíritu libre']].map(([id,emoji,label,sub])=>`<button class="species-choice" type="button" data-species="${id}" aria-pressed="${state.species===id}"><span class="emoji">${emoji}</span><span><strong>${label}</strong><small>${sub}</small></span></button>`).join('')}
     </div></div>
     <div class="form-group"><span class="field-title"><span class="field-index">02</span> Selecciona su raza</span>
-      ${state.species?`<div class="breed-grid">${BREEDS[state.species].map(b=>`<button type="button" class="breed-choice" data-breed="${b.id}" aria-pressed="${state.breed===b.id}" title="${b.name}"><span class="pet-thumbnail">${petSVG(state.species,b.id,state.collar)}</span><strong>${b.name}</strong></button>`).join('')}</div><p class="hint">Cinco razas disponibles por animal.</p>`:'<div class="empty-choice">Primero selecciona perro o gato para descubrir las cinco razas.</div>'}
+      ${state.species?`<div class="breed-grid">${BREEDS[state.species].map(b=>`<button type="button" class="breed-choice" data-breed="${b.id}" aria-pressed="${state.breed===b.id}" title="${b.name}">${b.isNew?'<span class="breed-badge">Nuevo</span>':''}<span class="pet-thumbnail">${petSVG(state.species,b.id,state.collar)}</span><strong>${b.name}</strong></button>`).join('')}</div><p class="hint">${BREEDS[state.species].length} razas, cada una con su propia personalidad.</p>`:'<div class="empty-choice">Primero selecciona perro o gato para descubrir sus razas.</div>'}
     </div>
     <div class="form-group"><span class="field-title"><span class="field-index">03</span> Dale su toque personal</span><div class="collar-name-grid"><div><span class="mini-label">Color de collar</span><div class="color-options">${COLORS.map(c=>`<button class="color-choice" type="button" data-collar="${c.value}" aria-label="Collar ${c.label}" aria-pressed="${state.collar===c.value}" title="${c.label}"><span style="background:${c.value}"></span></button>`).join('')}</div></div>
       <div><label for="pet-name" class="mini-label">Nombre (opcional)</label><input id="pet-name" class="name-field" maxlength="16" autocomplete="off" placeholder="Ej. Luna" value="${escapeText(state.name)}" /></div></div></div>
-    <button id="continue" class="button button-primary button-wide" type="button" ${complete?'':'disabled'}>${full?'Constelación completa · 42 mascotas':'Revisar mi mascota →'}</button><p class="field-note">${full?'Retira una mascota desde el centro de control para crear otra.':'Confirma el diseño y paga $0.01 MXN para enviarla a la pantalla 2.'}</p>`;
+    <button id="continue" class="button button-primary button-wide" type="button" ${complete?'':'disabled'}>${actionContent(full?'Constelación completa':'Revisar mi mascota','arrow',full?'42 de 42 mascotas':complete?'Tu compañero está listo para el siguiente paso':'Elige un animal y una raza para continuar')}</button><p class="field-note">${full?'Retira una mascota desde el centro de control para crear otra.':'Confirma el diseño y paga $0.01 MXN para enviarla a la pantalla 2.'}</p>`;
   formRegion.querySelectorAll('[data-species]').forEach(btn=>btn.addEventListener('click',()=>{
     if(state.species!==btn.dataset.species){state.species=btn.dataset.species;state.breed=null;}
     renderCreate();renderPreview();
@@ -79,6 +85,7 @@ function reviewMarkup(){
 function renderReview(){
   formRegion.innerHTML=header('Confirma tu mascota','Revisa el diseño antes de pagar.',2)+reviewMarkup()+'<p class="confirm-text">El siguiente paso es pagar $0.01 MXN con QR. Tu mascota aparecerá en la pantalla compartida cuando Pey apruebe el cobro.</p><div class="form-actions"><button class="button button-outline" id="edit">Editar</button><button class="button button-primary" id="confirm">Confirmar y pagar $0.01</button></div>';
   document.getElementById('edit').addEventListener('click',()=>{state.step='create';render()});
+  document.getElementById('confirm').innerHTML=actionContent('Confirmar y pagar','qr','$0.01 MXN · Pago con CoDi');
   document.getElementById('confirm').addEventListener('click',beginPayment);
 }
 let paymentFlow=null, paymentResult=null;
@@ -107,6 +114,7 @@ function renderPayment(){
   if(p.status==='qr'){
     formRegion.innerHTML=header('Escanea y paga $0.01 MXN','Abre tu app bancaria y autoriza el cobro.',3)+'<div class="payment-center"><img class="payment-qr" id="payment-qr" alt="QR CoDi de cobro por un centavo"><p>Después de pagar, pulsa el botón para validar. Tendremos hasta 2 minutos para recibir la confirmación.</p><button class="button button-primary" id="validate-payment">Ya pagué, validar cobro</button></div>';
     document.getElementById('payment-qr').src=p.qr.qrImage;
+    document.getElementById('validate-payment').innerHTML=actionContent('Ya pagué, validar cobro','check','Confirmaremos tu pago con Pey');
     document.getElementById('validate-payment').addEventListener('click',()=>paymentFlow.validate());return;
   }
   if(p.status==='waiting'){
@@ -121,7 +129,7 @@ function renderSent(){
     <div class="success-mark">✓</div><h2 class="confirm-heading">¡${escapeText(state.name.trim()||'Tu mascota')} despegó!</h2>
     <p class="success-text">${isDisplayOnline()?'La sumamos a la constelación de la pantalla 2.':'La mascota quedó guardada. Abre la pantalla 2 para verla flotar.'} Puedes crear otra mientras todas flotan juntas.</p>
     <div class="saved-pet" id="send-detail">${state.lastReceivedId===state.lastSentId && state.lastSentId?'✓ Recibida en la pantalla 2':isDisplayOnline()?'Esperando confirmación de recepción…':'Pantalla 2 desconectada; la mascota aparecerá cuando la abras.'}</div>
-    <div class="form-actions"><button type="button" id="new-pet" class="button button-primary button-wide">+ Crear otra mascota</button></div><p class="field-note">Todas las mascotas siguen flotando, hasta un máximo de 42.</p>`;
+    <div class="form-actions"><button type="button" id="new-pet" class="button button-primary button-wide">${actionContent('Crear otra mascota','plus','Dale un nuevo compañero a tu constelación')}</button></div><p class="field-note">Todas las mascotas siguen flotando, hasta un máximo de 42.</p>`;
   document.getElementById('new-pet').addEventListener('click',()=>{
     state.species=null;state.breed=null;state.collar=COLORS[0].value;state.name='';state.step='create';state.lastSentId=null;state.lastReceivedId=null;render();scrollTo({top:0,behavior:'smooth'});
   });

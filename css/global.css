@@ -12,10 +12,24 @@ button:not(:disabled):hover{filter:brightness(1.12)}
 .brand-light{color:#b9a9ff}
 .brand small{display:block;color:#7484aa;letter-spacing:2px;font-size:9px;margin-top:3px}
 .brand-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:15px;background:linear-gradient(135deg,#b99aff,#77eacb);color:#1b1938;font-size:28px;box-shadow:0 7px 20px #8a74f03a}
-.button{border:1px solid transparent;border-radius:13px;padding:13px 18px;font-size:13px;font-weight:800;color:white;white-space:nowrap}
-.button-primary{background:linear-gradient(105deg,#af8cff,#7157ee);box-shadow:0 12px 30px #805af44a}
-.button-ghost{background:#202c45;border-color:#3c4d6b}
-.button-outline{background:transparent;border-color:#43536d}
+.button{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;border:1px solid transparent;border-radius:14px;padding:13px 18px;font-size:13px;font-weight:750;line-height:1.4;color:white;white-space:normal;text-align:center;box-shadow:inset 0 1px 0 #ffffff12,0 3px 0 #060b1833;touch-action:manipulation}
+.button-primary{background:linear-gradient(115deg,#c1a1ff,#a386ff 55%,#8e7af4);color:#17112f;border-color:#d5bfff88;box-shadow:inset 0 1px 0 #ffffff60,0 4px 0 #554399,0 10px 24px #8060eb33;text-shadow:0 1px 0 #ffffff20}
+.button-ghost{background:linear-gradient(140deg,#2c3b57,#202b43);border-color:#536783;color:#e5edff}
+.button-outline{background:#18243a66;border-color:#4c5d79;color:#c8d4e8}
+.button:not(:disabled){transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background .18s ease}
+.button:not(:disabled):hover{filter:none}
+.button:not(:disabled):active{transform:translateY(2px);box-shadow:inset 0 2px 5px #0003,0 1px 0 #060b1833}
+.button:disabled{opacity:1;background:#202c41;border-color:#34425b;color:#8797b1;box-shadow:none;text-shadow:none}
+.button-icon{display:inline-grid;place-items:center;width:26px;height:26px;flex:none;border-radius:8px;background:#ffffff16}
+.button-primary .button-icon{background:#25164e14}
+.button-icon svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.button-label{text-align:left;min-width:0}.button-label small{display:block;font-size:10px;line-height:1.5;font-weight:550;opacity:.8;margin-top:2px}
+.button-trailing{margin-left:auto}
+@media(hover:hover){
+  .button:not(:disabled):hover{transform:translateY(-2px);border-color:#bda7ef;box-shadow:inset 0 1px 0 #ffffff25,0 6px 16px #05091844}
+  .button-primary:not(:disabled):hover{background:linear-gradient(115deg,#d1b8ff,#b096ff 55%,#a08bf9);box-shadow:inset 0 1px 0 #fff8,0 5px 0 #554399,0 14px 30px #8060eb55}
+  .button:not(:disabled):active{transform:translateY(2px);box-shadow:inset 0 2px 5px #0003}
+}
 .button-small{padding:10px 13px;font-size:12px}
 .button-wide{width:100%}
 @keyframes float{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-26px) rotate(1deg)}}
