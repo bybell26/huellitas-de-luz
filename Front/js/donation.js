@@ -83,7 +83,7 @@ async function buildAvatarPng(a){
     c.fillText(name||(a.species==='gato'?'Mi michi':'Mi perrito'),W/2,1130);
     const breed=getBreed(a.species,a.breed);
     c.fillStyle='#b3c1d8';c.font='400 42px "Segoe UI",Arial,sans-serif';c.fillText(`${a.species==='gato'?'Gato':'Perro'} · ${breed.name}`,W/2,1195);
-    c.fillStyle='#85eaca';c.font='600 32px "Segoe UI",Arial,sans-serif';c.fillText('✦ órbita pets · gracias por tu donativo',W/2,1280);
+    c.fillStyle='#85eaca';c.font='600 32px "Segoe UI",Arial,sans-serif';c.fillText('Huellitas de Luz · gracias por tu donativo 💜',W/2,1270);c.fillStyle='#b3c1d8';c.font='400 28px "Segoe UI",Arial,sans-serif';c.fillText('Tu mejor amigo en una imagen, tu ayuda en muchas vidas.',W/2,1315);
     return await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('No se pudo crear el PNG.')),'image/png'));
   }finally{URL.revokeObjectURL(url)}
 }
@@ -95,7 +95,7 @@ async function downloadAvatar(){
     const blob=await buildAvatarPng(a);
     const url=URL.createObjectURL(blob);
     const link=document.createElement('a');link.href=url;
-    link.download=((a.name||'').trim().replace(/[^\p{L}\p{N}_-]+/gu,'-')||'mascota')+'-orbita-pets.png';
+    link.download=((a.name||'').trim().replace(/[^\p{L}\p{N}_-]+/gu,'-')||'mascota')+'-huellitas-de-luz.png';
     document.body.appendChild(link);link.click();link.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
     notify('✓ Descarga iniciada');

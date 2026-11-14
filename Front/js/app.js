@@ -159,7 +159,7 @@ function renderRoster(){
   document.getElementById('roster-count').textContent=`${roster.length} / ${MAX_PETS}`;
   const list=document.getElementById('roster-list');
   if(!roster.length){
-    list.innerHTML='<div class="roster-empty"><span>✦</span><strong>Todavía no hay mascotas en órbita</strong><p>La primera que crees aparecerá aquí y en la pantalla 2.</p></div>';
+    list.innerHTML='<div class="roster-empty"><span>✦</span><strong>Todavía no hay mascotas en la constelación</strong><p>La primera que crees aparecerá aquí y en la pantalla 2.</p></div>';
     return;
   }
   list.innerHTML=roster.map((pet,i)=>{

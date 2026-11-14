@@ -1,4 +1,4 @@
-# Contexto del proyecto: Mascotas Solidarias (backend) + Órbita Pets (front)
+# Contexto del proyecto: Mascotas Solidarias (backend) + Huellitas de Luz (front)
 
 App web de beneficencia para el hackathon. El usuario crea un avatar de perro o gato (raza, collar y nombre), paga un donativo con QR CoDi (vía Pey) y descarga un PNG con su avatar y su nombre. La API está en C# / .NET 10 con SQLite. Este archivo resume el estado del proyecto para retomarlo en otra ruta o sesión.
 
@@ -7,7 +7,7 @@ App web de beneficencia para el hackathon. El usuario crea un avatar de perro o 
 ```
 huellitas-de-luz/
 ├─ Back/MascotasSolidarias/   API .NET 10 (este archivo vive aquí)
-└─ Front/                     Órbita Pets: HTML/CSS/JS sin dependencias de build
+└─ Front/                     Huellitas de Luz: HTML/CSS/JS sin dependencias de build
 ```
 
 Repo: `github.com/bybell26/huellitas-de-luz`. Rama de trabajo: `develop` (`main` tiene el front original subido por Fernando Lemus).

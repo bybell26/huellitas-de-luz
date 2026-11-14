@@ -1,5 +1,5 @@
 'use strict';
-// Órbita Pets 3.0 — Un escenario compartido, con posiciones estables por mascota.
+// Huellitas de Luz — Un escenario compartido, con posiciones estables por mascota.
 const constellation=document.getElementById('constellation');
 const waiting=document.getElementById('arrival-content');
 const announcement=document.getElementById('arrival-message');

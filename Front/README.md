@@ -1,6 +1,6 @@
-# Orbita Pets
+# Huellitas de Luz
 
-ÓRBITA PETS 3.0 — CONSTELACIÓN MULTIMASCOTA EN DOS MONITORES
+HUELLITAS DE LUZ — CONSTELACIÓN MULTIMASCOTA EN DOS MONITORES
 ============================================================
 
 QUÉ HACE

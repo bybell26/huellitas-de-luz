@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Servidor web local sin dependencias externas para Órbita Pets."""
+"""Servidor web local sin dependencias externas para Huellitas de Luz."""
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -16,7 +16,7 @@ except OSError:
     print(f"El puerto {PORT} está ocupado. Cierra el otro servidor o usa Live Server en VS Code.")
     sys.exit(1)
 url = f"http://{HOST}:{PORT}/index.html"
-print("\nÓRBITA PETS 3.0 | CONSTELACIÓN DIGITAL")
+print("\nHUELLITAS DE LUZ | CONSTELACIÓN DIGITAL")
 print(f"Creador:    {url}")
 print(f"Exhibición: http://{HOST}:{PORT}/display.html")
 print("Mantén esta ventana abierta durante la exhibición. Ctrl+C para cerrar.\n")
