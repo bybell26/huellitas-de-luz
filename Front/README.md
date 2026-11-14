@@ -106,3 +106,11 @@ VERIFICACIÓN RÁPIDA
 CÓDIGO Y USO
 Proyecto autónomo HTML/CSS/JavaScript. No usa librerías externas.
 Compatible con navegadores modernos Chrome o Microsoft Edge en Windows.
+
+INTEGRACION CON LA API DE DONATIVOS (Mascotas Solidarias)
+- Tras enviar la mascota aparece el boton 'Donar y descargar'. Crea una orden, muestra el QR CoDi de Pey, espera el pago y descarga un PNG con el avatar y su nombre.
+- js/api.js: URL de la API (window.ORBITA_API_BASE, por defecto http://localhost:5160), monto mostrado ($10) y monto enviado al back (0.01).
+- js/donation.js: pantallas de QR, loader, temporizador, pago y descarga.
+- js/qrcode.js: libreria qrcode-generator 1.4.4 (MIT), respaldo para dibujar el QR en modo Demo.
+- Requiere la API encendida en http://localhost:5160 (ver Back/MascotasSolidarias/CONTEXTO.md). El CORS de la API ya permite http://127.0.0.1:8000.
+- En modo Demo de la API aparece el boton 'Simular pago (demo)'.

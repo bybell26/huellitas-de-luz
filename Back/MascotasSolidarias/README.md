@@ -1,4 +1,4 @@
-﻿# Mascotas Solidarias — Backend para Visual Studio
+# Mascotas Solidarias — Backend para Visual Studio
 
 API C#/.NET 10 para ordenar un retrato, crear QR CoDi mediante pey, registrar el pago y habilitar la subida de la foto, la generación y la descarga. **MVP local funcional, no sistema de producción auditado ni despliegue AWS.**
 
@@ -30,6 +30,8 @@ dotnet run --project src/Mascotas.Api
 - `tests/smoke.py`: prueba de flujo y seguridad sin cobros externos.
 
 ## 3. Contrato para el frontend
+
+> **Estado actual:** el front del repo (`../../Front`) usa solo crear orden, QR y consulta de estado. Al llegar a `PAID` genera el PNG del avatar en el navegador. Subir foto y la generación con IA siguen en la API, pero ese front no las usa. Detalle en `FRONTEND.md` y `CONTEXTO.md`.
 
 Todas las rutas de orden salvo crear necesitan `Authorization: Bearer <orderToken>`; token secreto devuelto solo al crear. No exponerlo en URLs, logs, QR, ni repositorios. Para el MVP guárdalo en memoria o sessionStorage; evita scripts de terceros y XSS. En producción sustituir por cuentas/sesiones con autenticación completa.
 
@@ -91,13 +93,15 @@ La configuración también se lee de `src/Mascotas.Api/appsettings.Local.json` (
   "App:ImageServiceKey": "SECRETO_SERVIDOR_A_SERVIDOR"
 }
 ```
-`BankAccountId` vacío usa la cuenta ligada a la API key. Si se especifica, debe ser la autorizada y se exige que el webhook la reporte. ApiKeyId siempre se compara. La aplicación se niega a arrancar en modo real con generador Demo. User Secrets se usa en Development; en servidor configura variables de entorno (`App__ApiKey`, etc.) o gestor de secretos. No usar estos ejemplos como credenciales.
+`BankAccountId` vacío usa la cuenta ligada a la API key. Si se especifica, debe ser la autorizada y se exige que el webhook la reporte. ApiKeyId es opcional: si está configurado, siempre se compara; si está vacío, el webhook se autentica solo con la firma y se registra en el log el `apiKeyId` recibido para poder copiarlo (Pey no lo expone por API). `App:AllowDemoImageInPey=true` permite arrancar en modo Pey con el generador Demo; úsalo solo para pruebas. La aplicación se niega a arrancar en modo real con generador Demo, salvo con `App:AllowDemoImageInPey=true`. User Secrets se usa en Development; en servidor configura variables de entorno (`App__ApiKey`, etc.) o gestor de secretos. No usar estos ejemplos como credenciales.
 
 Publica primero en un HTTPS autorizado y registra en pey su URL `/api/webhooks/pey`; localhost no es accesible desde pey. Ajusta AllowedHosts a tu hostname y CorsOrigins al front real. CORS no autentica al proveedor. Usa el secreto específico del webhook. Al fallar la firma devuelve 401; al desconocer un QR devuelve 503 para permitir reintento; no marca como pagado por datos del navegador.
 
 La creación QR real usa `POST https://api.pey.mx/codi/qr`, expiración de 900 segundos, monto fijo, referencia numérica de hasta 7 dígitos, `generateImage=true`, metadata con orderId. Si hay timeout/error no se repite automáticamente: el QR podría haberse creado. Revisa pey y concilia antes de crear otra orden.
 
-## 6. Conectar al equipo que genera imágenes
+## 6. Conectar al equipo que genera imágenes (en pausa)
+
+El flujo actual del front no genera imágenes con IA, así que esta sección solo aplica si se retoma la subida de foto.
 
 El adaptador `HttpImageGenerator` espera que **su servicio** implemente:
 ```

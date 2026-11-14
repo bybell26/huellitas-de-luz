@@ -42,11 +42,15 @@ function watchPayment(){
 }
 async function beginDonation(){
   if(donation.busy)return;donation.busy=true;
+  donation.phase='creating';donation.error='';renderSupport();
+  const loaderText=text=>{const el=document.getElementById('loader-text');if(el)el.textContent=text};
   try{
     if(!donation.order){
+      loaderText('Creando tu orden…');
       const created=await OrdersApi.create();
       donation.order={id:created.id,token:created.orderToken};saveOrder(donation.order);
     }
+    loaderText('Generando tu código QR…');
     donation.qr=await OrdersApi.createQr(donation.order.id,donation.order.token);
     donation.busy=false;donation.phase='qr';renderSupport();watchPayment();startCountdown();
   }catch(error){
@@ -125,6 +129,8 @@ function renderSupport(){
       <div class="review-list"><div class="review-line"><span>Donativo</span><strong>${moneyLabel()}</strong></div><div class="review-line"><span>Forma de pago</span><strong>QR CoDi</strong></div></div>
       ${errorMarkup()}
       <div class="form-actions"><button type="button" class="button button-outline" id="back-sent">← Volver</button><button type="button" class="button button-primary" id="donate" ${donation.busy?'disabled':''}>${donation.busy?'Creando QR…':'Donar '+moneyLabel()+' con CoDi'}</button></div>`;
+  }else if(donation.phase==='creating'){
+    body=`<div class="qr-loading" role="status" aria-live="polite"><div class="qr-spinner" aria-hidden="true"></div><h2 class="confirm-heading">Preparando tu donativo</h2><p class="confirm-text" id="loader-text">Creando tu orden…</p><p class="field-note">Esto puede tardar unos segundos. No cierres esta ventana.</p></div>`;
   }else if(donation.phase==='qr'){
     const demoBtn=donation.qr?.isDemo?'<button type="button" class="button button-outline" id="sim-pay">Simular pago (demo)</button>':'';
     body=`<h2 class="confirm-heading">Escanea para donar ${moneyLabel()}</h2>
@@ -179,6 +185,7 @@ async function openSupport(){
       const info=await OrdersApi.get(saved.id,saved.token);
       if(['PAID','GENERATION_QUEUED','GENERATING','READY'].includes(info.status)){donation.phase='done'}
       else if(info.status==='PENDING_PAYMENT'){
+        donation.phase='creating';render();
         donation.qr=await OrdersApi.createQr(saved.id,saved.token);donation.phase='qr';render();watchPayment();startCountdown();return;
       }else if(STATUS_REVIEW.includes(info.status)){donation.phase='review'}
       else{resetDonation()}

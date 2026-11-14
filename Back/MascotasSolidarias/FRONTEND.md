@@ -2,11 +2,13 @@
 
 Swagger (solo en Development): `http://localhost:5160/swagger`
 
-Base URL local: `http://localhost:5160`. En CORS ya están permitidos `http://localhost:5173` y `https://localhost:5173`. Si tu front corre en otro origen, avisa al back para agregarlo en `CorsOrigins`.
+Base URL local: `http://localhost:5160`. En CORS ya están permitidos `http://localhost:5173`, `https://localhost:5173`, `http://127.0.0.1:8000` y `http://localhost:8000`. Si tu front corre en otro origen, avisa al back para agregarlo en `CorsOrigins`.
+
+> **Flujo que usa hoy el front (`Front/`):** pasos 1 a 3 (crear orden, QR y consultar hasta `PAID`). Al pagar, el front arma el PNG del avatar en el navegador y lo descarga. Los pasos 4 a 6 (subir foto, generar y descargar desde el servidor) siguen en la API pero **el front actual no los usa**. La URL base se cambia con `window.ORBITA_API_BASE` y las llamadas están en `Front/js/api.js`.
 
 Si la API se expone con ngrok (plan gratis), agrega a **todos** los `fetch` el header `ngrok-skip-browser-warning: 1`. Sin él, ngrok puede devolver una página HTML de advertencia en lugar del JSON.
 
-## Flujo
+## Flujo completo de la API
 
 ```
 1. POST /api/orders              → crea la orden, devuelve id y orderToken
@@ -43,7 +45,7 @@ Un token incorrecto o de otra orden devuelve `404`.
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `amountMxn` | número | Obligatorio. Máximo 1000 y 2 decimales. El mínimo lo define el back (`MinAmountMxn`, hoy 0.01). |
+| `amountMxn` | número | Obligatorio. Máximo 1000 y 2 decimales. El mínimo lo define el back (`MinAmountMxn`, hoy 0.01). El front muestra $10 pero manda 0.01 (valores en `Front/js/api.js`). |
 | `style` | string | Opcional. `cartoon` (default), `watercolor` o `astronaut`. |
 
 Respuesta `201`:
@@ -71,7 +73,8 @@ Respuesta `200`:
 ```
 
 - `qrImage` es un PNG en base64 sin prefijo. Muéstralo con `<img src={"data:image/png;base64," + qrImage}>`.
-- Si `qrImage` es `null`, genera el QR en el front con una librería, usando exactamente `qrString`.
+- Si `qrImage` es `null` (modo Demo), genera el QR en el front con una librería, usando exactamente `qrString`. El front actual usa `Front/js/qrcode.js` (qrcode-generator, MIT).
+- En modo real, muestra la imagen de Pey tal cual.
 - `qrExpiresAt` es Unix en segundos. El QR dura 15 minutos.
 - Si llamas otra vez con la orden en `PENDING_PAYMENT`, devuelve el mismo QR.
 - Si `isDemo` es `true`, el QR no cobra nada. Muestra un aviso de "modo demo".
