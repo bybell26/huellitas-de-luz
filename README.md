@@ -2,7 +2,8 @@
 
 ## Iniciar en Windows
 
-Requiere Node.js 22 o superior. Cierra el servidor anterior y ejecuta iniciar_windows.bat. Abre http://127.0.0.1:8000/index.html y, desde el creador, abre la pantalla 2. Conserva el mismo navegador y origen para recuperar la coleccion guardada.
+Requiere Node.js 22 o superior. 
+Abre http://127.0.0.1:8000/index.html y, desde el creador, abre la pantalla 2. Conserva el mismo navegador y origen para recuperar la coleccion guardada.
 
 El servidor ahora es servidor_local.cjs; servidor_local.py queda como lanzador compatible que delega a Node.js. Live Server por si solo no proporciona /api/pey.
 
