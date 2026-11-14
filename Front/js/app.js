@@ -97,7 +97,7 @@ function renderSent(){
     <div class="success-mark">✓</div><h2 class="confirm-heading">¡${escapeText(state.name.trim()||'Tu mascota')} despegó!</h2>
     <p class="success-text">${isDisplayOnline()?'La sumamos a la constelación de la pantalla 2.':'La mascota quedó guardada. Abre la pantalla 2 para verla flotar.'} Puedes crear otra mientras todas flotan juntas.</p>
     <div class="saved-pet" id="send-detail">${state.lastReceivedId===state.lastSentId && state.lastSentId?'✓ Recibida en la pantalla 2':isDisplayOnline()?'Esperando confirmación de recepción…':'Pantalla 2 desconectada; la mascota aparecerá cuando la abras.'}</div>
-    <div class="form-actions"><button type="button" id="go-support" class="button button-primary button-wide">♥ Donar ${moneyLabel()} y recibir su retrato</button></div>
+    <div class="form-actions"><button type="button" id="go-support" class="button button-primary button-wide">♥ Donar ${moneyLabel()} y descargar a ${escapeText(state.name.trim()||"tu mascota")}</button></div>
     <div class="form-actions"><button type="button" id="new-pet" class="button button-outline button-wide">+ Crear otra mascota</button></div><p class="field-note">Todas las mascotas siguen flotando, hasta un máximo de 42.</p>`;
   document.getElementById('go-support').addEventListener('click',openSupport);
   document.getElementById('new-pet').addEventListener('click',()=>{

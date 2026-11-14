@@ -40,4 +40,6 @@ public class Settings
     public string ImageServiceKey { get; set; } = "";
     public int MaxOrders { get; set; } = 100;
     public decimal MinAmountMxn { get; set; } = 0.01m;
+    // Solo para pruebas: permite cobrar en modo Pey con el generador Demo (SVG marcado DEMO). Debe ser false en producción.
+    public bool AllowDemoImageInPey { get; set; } = false;
 }

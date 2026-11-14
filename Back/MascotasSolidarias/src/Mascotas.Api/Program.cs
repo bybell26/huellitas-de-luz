@@ -18,8 +18,8 @@ settings.DataDirectory=Path.GetFullPath(settings.DataDirectory,builder.Environme
 Directory.CreateDirectory(settings.DataDirectory);
 if(settings.Mode is not ("Demo" or "Pey")) throw new InvalidOperationException("App:Mode must be Demo or Pey");
 if(settings.ImageProvider is not ("Demo" or "Http")) throw new InvalidOperationException("App:ImageProvider must be Demo or Http");
-if(settings.Mode=="Pey" && (string.IsNullOrWhiteSpace(settings.ApiKey) || string.IsNullOrWhiteSpace(settings.ApiKeyId) || string.IsNullOrWhiteSpace(settings.WebhookSecret) || settings.ImageProvider!="Http"))
-    throw new InvalidOperationException("Pey mode needs ApiKey, ApiKeyId, WebhookSecret and an Http image provider; real payments cannot use a demo image.");
+if(settings.Mode=="Pey" && (string.IsNullOrWhiteSpace(settings.ApiKey) || string.IsNullOrWhiteSpace(settings.WebhookSecret) || (settings.ImageProvider!="Http" && !settings.AllowDemoImageInPey)))
+    throw new InvalidOperationException("Pey mode needs ApiKey, WebhookSecret and an Http image provider (or App:AllowDemoImageInPey=true for tests only).");
 if(settings.ImageProvider=="Http" && (!Uri.TryCreate(settings.ImageServiceUrl,UriKind.Absolute,out var imageUri) || imageUri.Scheme!="https" || string.IsNullOrWhiteSpace(settings.ImageServiceKey)))
     throw new InvalidOperationException("Http image provider requires HTTPS URL and server-side key");
 builder.Services.AddSingleton(settings);
@@ -138,7 +138,10 @@ app.MapPost("/api/webhooks/pey",async(HttpRequest req,AppDb db,CancellationToken
         string? Str(string key)=>p.TryGetProperty(key,out var v) && v.ValueKind==JsonValueKind.String ? v.GetString():null;
         var qrId=Str("codiQrId"); var txId=Str("transactionId");
         if(string.IsNullOrWhiteSpace(qrId) || string.IsNullOrWhiteSpace(txId) || !p.TryGetProperty("amount",out var amountEl) || !amountEl.TryGetDecimal(out var amount) || !p.TryGetProperty("datePaid",out var dateEl) || !dateEl.TryGetInt64(out var paidAt)) return Results.BadRequest();
-        if(Str("apiKeyId")!=settings.ApiKeyId || (!string.IsNullOrEmpty(settings.BankAccountId) && Str("bankAccountId")!=settings.BankAccountId)) return Results.BadRequest();
+        // La firma HMAC ya autentica a Pey. Si ApiKeyId no está configurado, solo se registra el que llega para poder copiarlo.
+        if(string.IsNullOrWhiteSpace(settings.ApiKeyId)) app.Logger.LogWarning("Webhook sin App:ApiKeyId configurado. apiKeyId recibido: {ApiKeyId}",Str("apiKeyId"));
+        else if(Str("apiKeyId")!=settings.ApiKeyId) return Results.BadRequest();
+        if(!string.IsNullOrEmpty(settings.BankAccountId) && Str("bankAccountId")!=settings.BankAccountId) return Results.BadRequest();
         using var transaction=await db.Database.BeginTransactionAsync(ct);
         if(await db.Receipts.AnyAsync(x=>x.Id==webhookId || x.TransactionId==txId,ct)) return Results.Ok(new {duplicate=true});
         var order=await db.Orders.SingleOrDefaultAsync(x=>x.QrId==qrId,ct);

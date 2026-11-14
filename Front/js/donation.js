@@ -1,7 +1,7 @@
 'use strict';
-// Pantalla de donativo y retrato: pago con QR CoDi, subida de foto y descarga.
-const donation={phase:'intro',order:null,qr:null,error:'',pollTimer:null,countdownTimer:null,busy:false,photoName:''};
-const STATUS_REVIEW=['QR_REVIEW_REQUIRED','PAYMENT_REVIEW_REQUIRED','GENERATION_FAILED'];
+// Pantalla de donativo: pago con QR CoDi y descarga del avatar elegido (PNG con su nombre).
+const donation={phase:'intro',order:null,qr:null,error:'',pollTimer:null,countdownTimer:null,busy:false};
+const STATUS_REVIEW=['QR_REVIEW_REQUIRED','PAYMENT_REVIEW_REQUIRED'];
 
 function stopPolling(){clearInterval(donation.pollTimer);donation.pollTimer=null;stopCountdown()}
 function stopCountdown(){clearInterval(donation.countdownTimer);donation.countdownTimer=null}
@@ -16,7 +16,7 @@ function startCountdown(){
   };
   donation.countdownTimer=setInterval(tick,1000);tick();
 }
-function resetDonation(){stopPolling();clearOrder();Object.assign(donation,{phase:'intro',order:null,qr:null,error:'',busy:false,photoName:''})}
+function resetDonation(){stopPolling();clearOrder();Object.assign(donation,{phase:'intro',order:null,qr:null,error:'',busy:false})}
 function moneyLabel(){return '$'+DONATION_DISPLAY_MXN+' MXN'}
 function setPhase(phase,error=''){donation.phase=phase;donation.error=error;renderSupport()}
 
@@ -36,20 +36,10 @@ function startPolling(onStatus){
 
 function watchPayment(){
   startPolling(info=>{
-    if(info.status==='PAID'){stopPolling();setPhase('photo')}
-    else if(STATUS_REVIEW.includes(info.status)){stopPolling();setPhase('review')}
-    else if(['GENERATION_QUEUED','GENERATING'].includes(info.status)){stopPolling();watchGeneration()}
-    else if(info.status==='READY'){stopPolling();setPhase('done')}
-  });
-}
-function watchGeneration(){
-  donation.phase='working';renderSupport();
-  startPolling(info=>{
-    if(info.canDownload){stopPolling();setPhase('done')}
+    if(['PAID','GENERATION_QUEUED','GENERATING','READY'].includes(info.status)){stopPolling();setPhase('done')}
     else if(STATUS_REVIEW.includes(info.status)){stopPolling();setPhase('review')}
   });
 }
-
 async function beginDonation(){
   if(donation.busy)return;donation.busy=true;
   try{
@@ -66,30 +56,48 @@ async function beginDonation(){
   }
 }
 
-async function sendPhoto(file){
-  if(donation.busy)return;
-  if(!['image/png','image/jpeg'].includes(file.type)){setPhase('photo','Usa una imagen PNG o JPEG.');return}
-  if(file.size>5*1024*1024){setPhase('photo','La foto pesa más de 5 MB.');return}
-  donation.busy=true;donation.photoName=file.name;donation.error='';renderSupport();
-  try{
-    await OrdersApi.uploadPhoto(donation.order.id,donation.order.token,file);
-    donation.busy=false;watchGeneration();
-  }catch(error){donation.busy=false;setPhase('photo',error.message)}
+// Avatar a descargar: el que se acaba de enviar; si se recargó la página, el último de la constelación.
+function chosenAvatar(){
+  return readRoster().find(a=>a.id===state.lastSentId)||latestAvatar()||null;
 }
-
-async function downloadPortrait(){
-  if(donation.busy)return;donation.busy=true;
+function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('No se pudo preparar la imagen.'));img.src=src})}
+async function buildAvatarPng(a){
+  const svg=petSVG(a.species,a.breed,a.collar,a.name);
+  const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));
   try{
-    const {blob,type}=await OrdersApi.download(donation.order.id,donation.order.token);
-    const ext=type.includes('svg')?'svg':'png';
+    const img=await loadImage(url);
+    const W=1080,H=1350,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+    const c=canvas.getContext('2d');
+    const bg=c.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#0b1230');bg.addColorStop(1,'#241c5c');c.fillStyle=bg;c.fillRect(0,0,W,H);
+    const glow=c.createRadialGradient(W/2,560,60,W/2,560,560);glow.addColorStop(0,'rgba(133,234,202,.22)');glow.addColorStop(1,'rgba(133,234,202,0)');c.fillStyle=glow;c.fillRect(0,0,W,H);
+    c.fillStyle='rgba(255,255,255,.55)';
+    for(let i=0;i<46;i++){const x=(i*397)%W,y=(i*613)%H,r=1+(i%3);c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill()}
+    const w=780,h=w*img.naturalHeight/img.naturalWidth||w*340/320;
+    c.drawImage(img,(W-w)/2,140,w,h);
+    c.textAlign='center';c.fillStyle='#ffffff';c.font='700 92px "Segoe UI",Arial,sans-serif';
+    const name=(a.name||'').trim();
+    c.fillText(name||(a.species==='gato'?'Mi michi':'Mi perrito'),W/2,1130);
+    const breed=getBreed(a.species,a.breed);
+    c.fillStyle='#b3c1d8';c.font='400 42px "Segoe UI",Arial,sans-serif';c.fillText(`${a.species==='gato'?'Gato':'Perro'} · ${breed.name}`,W/2,1195);
+    c.fillStyle='#85eaca';c.font='600 32px "Segoe UI",Arial,sans-serif';c.fillText('✦ órbita pets · gracias por tu donativo',W/2,1280);
+    return await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('No se pudo crear el PNG.')),'image/png'));
+  }finally{URL.revokeObjectURL(url)}
+}
+async function downloadAvatar(){
+  if(donation.busy)return;
+  const a=chosenAvatar();if(!a){notify('No encontré la mascota para descargar.');return}
+  donation.busy=true;
+  try{
+    const blob=await buildAvatarPng(a);
     const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download='retrato-mascota.'+ext;document.body.appendChild(a);a.click();a.remove();
+    const link=document.createElement('a');link.href=url;
+    link.download=((a.name||'').trim().replace(/[^\p{L}\p{N}_-]+/gu,'-')||'mascota')+'-orbita-pets.png';
+    document.body.appendChild(link);link.click();link.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
     notify('✓ Descarga iniciada');
   }catch(error){notify(error.message)}
   donation.busy=false;
 }
-
 function localQrDataUrl(text){
   try{const qr=qrcode(0,'M');qr.addData(text);qr.make();return qr.createDataURL(8,0)}catch(error){return null}
 }
@@ -108,11 +116,12 @@ function expiryText(){
 function errorMarkup(){return donation.error?`<p class="field-note" role="alert" style="color:#ffb4b4">${escapeText(donation.error)}</p>`:''}
 
 function renderSupport(){
-  const pet=escapeText(state.name.trim()||'tu mascota');
+  const chosen=chosenAvatar();
+  const pet=escapeText((chosen?.name||state.name||'').trim()||'tu mascota');
   let body='';
   if(donation.phase==='intro'){
-    body=`<h2 class="confirm-heading">Un retrato real de ${pet}</h2>
-      <p class="confirm-text">Con un donativo de <strong>${moneyLabel()}</strong> apoyas a las mascotas y recibes una imagen ilustrada generada a partir de la foto de tu perro o gato.</p>
+    body=`<h2 class="confirm-heading">Llévate a ${pet}</h2>
+      <p class="confirm-text">Con un donativo de <strong>${moneyLabel()}</strong> apoyas a las mascotas y descargas la imagen de tu mascota con su nombre.</p>
       <div class="review-list"><div class="review-line"><span>Donativo</span><strong>${moneyLabel()}</strong></div><div class="review-line"><span>Forma de pago</span><strong>QR CoDi</strong></div></div>
       ${errorMarkup()}
       <div class="form-actions"><button type="button" class="button button-outline" id="back-sent">← Volver</button><button type="button" class="button button-primary" id="donate" ${donation.busy?'disabled':''}>${donation.busy?'Creando QR…':'Donar '+moneyLabel()+' con CoDi'}</button></div>`;
@@ -125,19 +134,11 @@ function renderSupport(){
       <div class="saved-pet qr-waiting"><span class="qr-pulse"></span>Esperando tu pago… se confirma solo.</div>
       ${errorMarkup()}
       <div class="form-actions">${demoBtn}</div>`;
-  }else if(donation.phase==='photo'){
-    body=`<div class="success-mark">✓</div><h2 class="confirm-heading">¡Gracias por tu donativo!</h2>
-      <p class="confirm-text">Sube una foto de ${pet} (PNG o JPEG, máximo 5 MB) y generamos su retrato.</p>
-      <label class="button button-primary button-wide" for="photo-input" style="display:block;text-align:center;cursor:pointer;margin-top:16px">${donation.busy?'Subiendo '+escapeText(donation.photoName)+'…':'Elegir foto'}</label>
-      <input id="photo-input" type="file" accept="image/png,image/jpeg" style="position:absolute;left:-9999px" ${donation.busy?'disabled':''}/>
-      ${errorMarkup()}`;
-  }else if(donation.phase==='working'){
-    body=`<div class="big-paw" style="font-size:42px;margin:8px 0">🐾</div><h2 class="confirm-heading">Creando el retrato de ${pet}…</h2>
-      <p class="confirm-text">Puede tardar un minuto. No cierres esta ventana.</p>`;
   }else if(donation.phase==='done'){
-    body=`<div class="success-mark">✓</div><h2 class="confirm-heading">¡El retrato de ${pet} está listo!</h2>
-      <p class="confirm-text">Descárgalo y compártelo. ¡Gracias por apoyar!</p>
-      <div class="form-actions"><button type="button" class="button button-primary button-wide" id="download">⬇ Descargar retrato</button></div>
+    body=`<div class="success-mark">✓</div><h2 class="confirm-heading">¡Gracias por tu donativo!</h2>
+      <p class="confirm-text">${pet} ya está listo para descargar.</p>
+      ${chosen?`<div class="download-preview">${petSVG(chosen.species,chosen.breed,chosen.collar,chosen.name)}</div>`:''}
+      <div class="form-actions"><button type="button" class="button button-primary button-wide" id="download">⬇ Descargar a ${pet}</button></div>
       <div class="form-actions"><button type="button" class="button button-outline button-wide" id="finish">Crear otra mascota</button></div>`;
   }else if(donation.phase==='expired'){
     body=`<h2 class="confirm-heading">El QR venció</h2>
@@ -145,30 +146,27 @@ function renderSupport(){
       <div class="form-actions"><button type="button" class="button button-primary button-wide" id="retry-qr">Generar QR nuevo</button></div>`;
   }else if(donation.phase==='review'){
     body=`<h2 class="confirm-heading">Necesitamos revisar tu orden</h2>
-      <p class="confirm-text">Algo no quedó claro con el pago o la imagen. Contacta al organizador con el código de tu orden y no pagues de nuevo.</p>
+      <p class="confirm-text">Algo no quedó claro con el pago. Contacta al organizador con el código de tu orden y no pagues de nuevo.</p>
       <div class="saved-pet">Código: <code>${escapeText(donation.order?.id||'sin orden')}</code></div>
       <div class="form-actions"><button type="button" class="button button-outline button-wide" id="finish">Volver al inicio</button></div>`;
   }else{
     body=`<h2 class="confirm-heading">Algo salió mal</h2>${errorMarkup()}
       <div class="form-actions"><button type="button" class="button button-outline button-wide" id="finish">Volver al inicio</button></div>`;
   }
-  formRegion.innerHTML=`${header('Donativo y retrato','Último paso: apoya y recibe la imagen de tu mascota.',3)}${body}`;
+  formRegion.innerHTML=`${header('Donativo','Último paso: apoya y descarga a tu mascota.',3)}${body}`;
   bindSupport();
 }
-
 function bindSupport(){
   const on=(id,fn)=>{const el=document.getElementById(id);if(el)el.addEventListener('click',fn)};
   on('back-sent',()=>{state.step='sent';render()});
   on('donate',beginDonation);
   on('retry-qr',()=>{resetDonation();beginDonation()});
-  on('download',downloadPortrait);
+  on('download',downloadAvatar);
   on('finish',()=>{resetDonation();state.species=null;state.breed=null;state.collar=COLORS[0].value;state.name='';state.step='create';state.lastSentId=null;state.lastReceivedId=null;render();scrollTo({top:0,behavior:'smooth'})});
   on('sim-pay',async()=>{
     try{await OrdersApi.simulatePayment(donation.order.id,donation.order.token)}
     catch(error){donation.error=error.message;renderSupport()}
   });
-  const input=document.getElementById('photo-input');
-  if(input)input.addEventListener('change',()=>{const f=input.files&&input.files[0];if(f)sendPhoto(f)});
 }
 
 // Entrada desde la pantalla "enviada". Retoma una orden guardada en esta pestaña si existe.
@@ -179,9 +177,7 @@ async function openSupport(){
     donation.order=saved;
     try{
       const info=await OrdersApi.get(saved.id,saved.token);
-      if(info.canDownload){donation.phase='done'}
-      else if(info.canUploadPhoto){donation.phase='photo'}
-      else if(['GENERATION_QUEUED','GENERATING'].includes(info.status)){render();watchGeneration();return}
+      if(['PAID','GENERATION_QUEUED','GENERATING','READY'].includes(info.status)){donation.phase='done'}
       else if(info.status==='PENDING_PAYMENT'){
         donation.qr=await OrdersApi.createQr(saved.id,saved.token);donation.phase='qr';render();watchPayment();startCountdown();return;
       }else if(STATUS_REVIEW.includes(info.status)){donation.phase='review'}

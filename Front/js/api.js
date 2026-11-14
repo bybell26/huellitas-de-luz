@@ -37,10 +37,5 @@ const OrdersApi={
   create(){return apiFetch('/api/orders',{method:'POST',body:{amountMxn:DONATION_CHARGE_MXN,style:DONATION_STYLE}})},
   createQr(id,token){return apiFetch(`/api/orders/${id}/qr`,{method:'POST',token})},
   get(id,token){return apiFetch(`/api/orders/${id}`,{token})},
-  simulatePayment(id,token){return apiFetch(`/api/orders/${id}/simulate-payment`,{method:'POST',token})},
-  uploadPhoto(id,token,file){return apiFetch(`/api/orders/${id}/photo`,{method:'POST',token,body:file,contentType:file.type})},
-  async download(id,token){
-    const response=await apiFetch(`/api/orders/${id}/download`,{token,raw:true});
-    return {blob:await response.blob(),type:response.headers.get('Content-Type')||''};
-  }
+  simulatePayment(id,token){return apiFetch(`/api/orders/${id}/simulate-payment`,{method:'POST',token})}
 };
