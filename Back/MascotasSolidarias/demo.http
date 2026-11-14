@@ -1,0 +1,29 @@
+@host = http://localhost:5160
+@id = COPIAR_ID
+@token = COPIAR_ORDER_TOKEN
+
+### Crear orden de prueba (PNG mínimo)
+POST {{host}}/api/orders/
+Content-Type: application/json
+
+{"amountMxn":10,"style":"cartoon","photoBase64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6JZQAAAAASUVORK5CYII="}
+
+### Copiar id y token de la respuesta a variables arriba
+POST {{host}}/api/orders/{{id}}/qr
+Authorization: Bearer {{token}}
+
+### SOLO DEMO: nunca existe esta ruta en modo Pey
+POST {{host}}/api/orders/{{id}}/simulate-payment
+Authorization: Bearer {{token}}
+
+### Generar (una sola vez, debe estar pagado)
+POST {{host}}/api/orders/{{id}}/generate
+Authorization: Bearer {{token}}
+
+### Estado
+GET {{host}}/api/orders/{{id}}
+Authorization: Bearer {{token}}
+
+### Descargar
+GET {{host}}/api/orders/{{id}}/download
+Authorization: Bearer {{token}}
