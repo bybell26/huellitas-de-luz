@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pey - Cobro de $0.01</title><link rel="stylesheet" href="style.css"><script src="payment-flow.js" defer></script><script src="app.js" defer></script></head>
+<body><main>
+<header><span class="eyebrow">ORBITA PETS - PRUEBA PEY</span><h1>Tu pago, en tres pasos</h1><p>Cobro real de <strong>$0.01 MXN</strong></p></header>
+<nav aria-label="Progreso"><span id="step-qr">1. Codigo QR</span><span id="step-loading">2. Confirmacion</span><span id="step-result">3. Resultado</span></nav>
+<section id="screen-qr" class="screen"><span class="eyebrow">PASO 1</span><h2>Escanea para pagar</h2><div class="price">$0.01 <small>MXN</small></div><p id="qr-notice" role="status">Preparando tu codigo QR...</p><img id="qr-image" alt="QR CoDi para pagar un centavo" hidden><p id="qr-reference"></p><button id="paid-button" disabled>Ya realice el pago</button><p>Escanea con tu app bancaria y autoriza el cobro. La confirmacion se consulta automaticamente.</p></section>
+<section id="screen-loading" class="screen" hidden><span class="eyebrow">PASO 2</span><div class="spinner" aria-hidden="true"></div><h2>Confirmando tu pago</h2><p id="loading-notice" role="status" aria-live="polite">Esperando la confirmacion de Pey...</p><p>Monto: $0.01 MXN. Esta pantalla se actualiza automaticamente.</p><button id="back-button">Volver a ver el QR</button></section>
+<section id="screen-result" class="screen" hidden><span class="eyebrow">PASO 3</span><div id="result-icon" class="result-icon"></div><h2 id="result-title"></h2><p id="result-description" role="status" aria-live="polite"></p><p id="transaction-id"></p><button id="retry-button" hidden>Volver a consultar</button><button id="new-button">Iniciar otro cobro de $0.01</button></section>
+<footer>La confirmacion depende de Pey. Un error de conexion no significa que tu pago fue rechazado.</footer>
+</main></body></html>

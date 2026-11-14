@@ -56,7 +56,7 @@ function renderCreate(){
     </div>
     <div class="form-group"><span class="field-title"><span class="field-index">03</span> Dale su toque personal</span><div class="collar-name-grid"><div><span class="mini-label">Color de collar</span><div class="color-options">${COLORS.map(c=>`<button class="color-choice" type="button" data-collar="${c.value}" aria-label="Collar ${c.label}" aria-pressed="${state.collar===c.value}" title="${c.label}"><span style="background:${c.value}"></span></button>`).join('')}</div></div>
       <div><label for="pet-name" class="mini-label">Nombre (opcional)</label><input id="pet-name" class="name-field" maxlength="16" autocomplete="off" placeholder="Ej. Luna" value="${escapeText(state.name)}" /></div></div></div>
-    <button id="continue" class="button button-primary button-wide" type="button" ${complete?'':'disabled'}>${full?'Constelación completa · 42 mascotas':'Revisar mi mascota →'}</button><p class="field-note">${full?'Retira una mascota desde el centro de control para crear otra.':'Solo tendrás que confirmarla dos veces antes de enviarla a la pantalla 2.'}</p>`;
+    <button id="continue" class="button button-primary button-wide" type="button" ${complete?'':'disabled'}>${full?'Constelación completa · 42 mascotas':'Revisar mi mascota →'}</button><p class="field-note">${full?'Retira una mascota desde el centro de control para crear otra.':'Confirma el diseño y paga $0.01 MXN para enviarla a la pantalla 2.'}</p>`;
   formRegion.querySelectorAll('[data-species]').forEach(btn=>btn.addEventListener('click',()=>{
     if(state.species!==btn.dataset.species){state.species=btn.dataset.species;state.breed=null;}
     renderCreate();renderPreview();
@@ -77,19 +77,43 @@ function reviewMarkup(){
     <div class="review-line"><span>Nombre</span><strong>${escapeText(state.name.trim()||'Sin nombre')}</strong></div></div>`;
 }
 function renderReview(){
-  const first=state.step==='review1';
-  formRegion.innerHTML=`${header('¿Así te gusta?','Revísala antes de dejarla volar.',first?2:3)}
-    <span class="pill">CONFIRMACIÓN ${first?'1':'2'} DE 2</span>
-    <h2 class="confirm-heading">${first?'¿Está todo correcto?':'¿La enviamos a volar?'}</h2>
-    <p class="confirm-text">${first?'Revisa la raza, el collar y el nombre de tu mascota.':'Esta confirmación enviará a tu mascota al otro monitor. La pantalla de creación permanecerá abierta.'}</p>
-    ${reviewMarkup()}
-    <div class="review-note"><span class="review-note-icon">${first?'1':'2'}</span><div><strong>${first?'Primera confirmación':'Segunda confirmación'}</strong><p>${first?'Aprueba cómo quedó tu creación.':'Autoriza la aparición en la pantalla de exhibición.'}</p></div></div>
-    <div class="form-actions"><button type="button" class="button button-outline" id="edit">← ${first?'Editar':'Volver'}</button><button type="button" class="button button-primary" id="confirm">${first?'✓ Confirmar diseño (1/2)':'✦ Confirmar y enviar (2/2)'}</button></div>`;
-  document.getElementById('edit').addEventListener('click',()=>{state.step=first?'create':'review1';render()});
-  document.getElementById('confirm').addEventListener('click',()=>{
-    if(first){state.step='review2';render()}
-    else startSending();
-  });
+  formRegion.innerHTML=header('Confirma tu mascota','Revisa el diseño antes de pagar.',2)+reviewMarkup()+'<p class="confirm-text">El siguiente paso es pagar $0.01 MXN con QR. Tu mascota aparecerá en la pantalla compartida cuando Pey apruebe el cobro.</p><div class="form-actions"><button class="button button-outline" id="edit">Editar</button><button class="button button-primary" id="confirm">Confirmar y pagar $0.01</button></div>';
+  document.getElementById('edit').addEventListener('click',()=>{state.step='create';render()});
+  document.getElementById('confirm').addEventListener('click',beginPayment);
+}
+let paymentFlow=null, paymentResult=null;
+function beginPayment(){
+  if(state.busy)return;
+  if(readRoster().length>=MAX_PETS){notify('La constelación está llena. Retira una mascota antes de pagar.');return}
+  paymentFlow?.dispose();state.busy=true;state.step='payment';
+  paymentFlow=createPaymentFlow(updatePayment);
+  paymentFlow.start();
+}
+function updatePayment(update){
+  paymentResult=update;
+  if(update.status==='paid'){
+    state.busy=false;
+    startSending(update.transaction);
+    return;
+  }
+  if(update.status==='rejected'||update.status==='error')state.busy=false;
+  renderPayment();renderPreview();
+}
+function renderPayment(){
+  const p=paymentResult||{status:'creating'};
+  if(p.status==='creating'){
+    formRegion.innerHTML=header('Preparando tu cobro','Pago de $0.01 MXN',3)+'<div class="payment-spinner"></div><p>Generando tu QR...</p>';return;
+  }
+  if(p.status==='qr'){
+    formRegion.innerHTML=header('Escanea y paga $0.01 MXN','Abre tu app bancaria y autoriza el cobro.',3)+'<div class="payment-center"><img class="payment-qr" id="payment-qr" alt="QR CoDi de cobro por un centavo"><p>Después de pagar, pulsa el botón para validar. Tendremos hasta 2 minutos para recibir la confirmación.</p><button class="button button-primary" id="validate-payment">Ya pagué, validar cobro</button></div>';
+    document.getElementById('payment-qr').src=p.qr.qrImage;
+    document.getElementById('validate-payment').addEventListener('click',()=>paymentFlow.validate());return;
+  }
+  if(p.status==='waiting'){
+    formRegion.innerHTML=header('Validando tu pago','Esperando la confirmación de Pey.',3)+'<div class="payment-center"><div class="payment-spinner"></div><h2>Confirmando $0.01 MXN</h2><p>Tiempo máximo: 2 minutos. Tu mascota aparecerá solo si el pago es aprobado.</p><p>'+escapeText(p.message||'Consultando el estado del pago...')+'</p></div>';return;
+  }
+  formRegion.innerHTML=header(p.status==='rejected'?'Cobro rechazado':'No se pudo preparar el cobro','La mascota no se envió a la pantalla compartida.',3)+'<p class="success-text">'+escapeText(p.message||'No fue posible completar el cobro.')+'</p><button class="button button-outline" id="payment-back">Volver a mi mascota</button>';
+  document.getElementById('payment-back').addEventListener('click',()=>{paymentFlow?.dispose();state.step='review1';render()});
 }
 function renderSent(){
   const avatar=readRoster().find(a=>a.id===state.lastSentId);
@@ -106,32 +130,23 @@ function renderSent(){
 function render(){
   if(state.step==='create')renderCreate();
   else if(state.step==='sent')renderSent();
+  else if(state.step==='payment')renderPayment();
   else renderReview();
   renderPreview();refreshRoster();
 }
-function startSending(){
-  if(state.busy||!state.species||!state.breed)return;
-  if(readRoster().length>=MAX_PETS){notify('La constelación está llena (42 mascotas). Retira alguna para continuar.');return}
-  state.busy=true;
-  const loading=document.getElementById('loading');const bar=document.getElementById('progress');const progressText=document.getElementById('progress-text');
-  loading.classList.add('active');loading.setAttribute('aria-hidden','false');bar.style.width='0%';progressText.textContent='0%';
-  let val=0;
-  const timer=setInterval(()=>{
-    val=Math.min(100,val+10);bar.style.width=val+'%';progressText.textContent=val+'%';
-    if(val===100){
-      clearInterval(timer);
-      const avatar={id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),species:state.species,breed:state.breed,collar:state.collar,name:state.name.trim(),createdAt:Date.now()};
-      try{
-        const saved=addAvatar(avatar);
-        state.lastSentId=saved.id;
-        bus.publish({type:'sync',addedId:saved.id});
-        state.step='sent';
-      }catch(error){
-        state.step='review2';notify(error?.message==='full'?'La constelación está llena. Retira una mascota.':'No fue posible guardar el avatar. Verifica el almacenamiento local.');
-      }
-      state.busy=false;loading.classList.remove('active');loading.setAttribute('aria-hidden','true');render();
-    }
-  },105);
+function startSending(transaction){
+  if(!transaction||transaction.status!=='PAID'||Number(transaction.amount)!==0.01||!state.species||!state.breed)return;
+  const avatar={id:'pey-'+transaction.id,species:state.species,breed:state.breed,collar:state.collar,name:state.name.trim(),createdAt:Date.now()};
+  try{
+    const existing=readRoster().find(p=>p.id===avatar.id);
+    const saved=existing||addAvatar(avatar);
+    state.lastSentId=saved.id;
+    bus.publish({type:'sync',addedId:saved.id});
+    state.step='sent';state.busy=false;render();
+  }catch(error){
+    formRegion.innerHTML=header('Pago aprobado','Tu cobro fue confirmado por Pey.',3)+'<p>La mascota todavía no pudo guardarse. Si la constelación está llena, retira una mascota. No necesitas pagar de nuevo.</p><button class="button button-primary" id="retry-delivery">Enviar mi mascota sin volver a pagar</button>';
+    document.getElementById('retry-delivery').addEventListener('click',()=>startSending(transaction));
+  }
 }
 function openDisplay(){const url=new URL('display.html',window.location.href);const opened=window.open(url.href,'orbita-pets-display','width=1280,height=800,resizable=yes,scrollbars=yes');if(!opened){notify('Tu navegador bloqueó la ventana. Abre display.html manualmente.')}else{opened.focus();notify('Mueve la ventana nueva al monitor 2 y activa pantalla completa.')}}
 document.getElementById('open-display').addEventListener('click',openDisplay);
