@@ -50,7 +50,9 @@ using(var scope=app.Services.CreateScope())
     db.Orders.Where(x=>x.Status==States.QrCreating).ExecuteUpdate(s=>s.SetProperty(x=>x.Status,States.QrUnknown));
 }
 // Detrás de ngrok/proxy local: usa la IP real del cliente para el rate limit (solo confía en proxies loopback).
-app.UseForwardedHeaders(new ForwardedHeadersOptions{ForwardedHeaders=ForwardedHeaders.XForwardedFor|ForwardedHeaders.XForwardedProto});
+var forwarded=new ForwardedHeadersOptions{ForwardedHeaders=ForwardedHeaders.XForwardedFor|ForwardedHeaders.XForwardedProto};
+if(settings.TrustProxyHeaders){ forwarded.KnownIPNetworks.Clear(); forwarded.KnownProxies.Clear(); } // en Railway el proxy no es loopback
+app.UseForwardedHeaders(forwarded);
 app.Use(async(ctx,next)=> {
     ctx.Response.Headers.CacheControl="no-store";
     ctx.Response.Headers["X-Content-Type-Options"]="nosniff";

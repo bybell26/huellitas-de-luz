@@ -42,4 +42,6 @@ public class Settings
     public decimal MinAmountMxn { get; set; } = 0.01m;
     // Solo para pruebas: permite cobrar en modo Pey con el generador Demo (SVG marcado DEMO). Debe ser false en producción.
     public bool AllowDemoImageInPey { get; set; } = false;
+    // Detras de un proxy de plataforma (Railway): confia en X-Forwarded-For/Proto del proxy. Debe ser false si la API se expone directo.
+    public bool TrustProxyHeaders { get; set; } = false;
 }

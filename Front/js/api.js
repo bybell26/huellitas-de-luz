@@ -1,7 +1,9 @@
 'use strict';
 // Configuración del backend (Mascotas Solidarias API).
 // Para usar ngrok, define antes de cargar este archivo: window.ORBITA_API_BASE='https://<dominio>.ngrok-free.dev'
-const API_BASE=(window.ORBITA_API_BASE||'http://localhost:5160').replace(/\/$/,'');
+// Local: API en localhost:5160. Publicado en Railway: API del servicio back.
+const API_DEFAULT=location.hostname.endsWith('.up.railway.app')?'https://huellitas-de-luz-production.up.railway.app':'http://localhost:5160';
+const API_BASE=(window.ORBITA_API_BASE||API_DEFAULT).replace(/\/$/,'');
 // Monto que ve el usuario en pantalla (demo) y monto que se manda realmente al back.
 const DONATION_DISPLAY_MXN=10;
 const DONATION_CHARGE_MXN=0.01;
