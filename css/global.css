@@ -1,0 +1,33 @@
+:root{color-scheme:dark;--bg:#0a1021;--panel:#141e35;--panel-alt:#19253e;--border:#34435e;--text:#f5f6ff;--muted:#a6b4ce;--violet:#aa83ff;--mint:#87efd5;--accent:#9170f9;--focus:#9affdd}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;font-family:Inter,'Segoe UI',Arial,sans-serif;color:var(--text);background:radial-gradient(ellipse at 13% 2%,#41347748,transparent 35%),radial-gradient(ellipse at 90% 94%,#125b6840,transparent 31%),var(--bg)}
+button,input{font:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+button:disabled{cursor:not-allowed;opacity:.44}
+button:not(:disabled){transition:transform .16s,border-color .16s,background .16s,filter .16s}
+button:not(:disabled):hover{filter:brightness(1.12)}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-weight:900;font-size:23px;letter-spacing:-1px}
+.brand-light{color:#b9a9ff}
+.brand small{display:block;color:#7484aa;letter-spacing:2px;font-size:9px;margin-top:3px}
+.brand-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:15px;background:linear-gradient(135deg,#b99aff,#77eacb);color:#1b1938;font-size:28px;box-shadow:0 7px 20px #8a74f03a}
+.button{border:1px solid transparent;border-radius:13px;padding:13px 18px;font-size:13px;font-weight:800;color:white;white-space:nowrap}
+.button-primary{background:linear-gradient(105deg,#af8cff,#7157ee);box-shadow:0 12px 30px #805af44a}
+.button-ghost{background:#202c45;border-color:#3c4d6b}
+.button-outline{background:transparent;border-color:#43536d}
+.button-small{padding:10px 13px;font-size:12px}
+.button-wide{width:100%}
+@keyframes float{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-26px) rotate(1deg)}}
+@keyframes shadow{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.75);opacity:.54}}
+@keyframes twinkle{0%{opacity:.2}100%{opacity:1}}
+@keyframes pop{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes arrive{from{opacity:0;transform:translateY(80px) scale(.55) rotate(-10deg);filter:blur(16px)}65%{opacity:1}to{opacity:1;transform:translateY(0) scale(1) rotate(0);filter:blur(0)}}
+@media(max-width:650px){
+.brand{font-size:19px}
+.brand-icon{width:37px;height:37px}
+.button{font-size:11px;padding:10px 12px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+@keyframes constellation-float{0%{transform:translate(var(--dx-start),var(--dy-start)) rotate(-2deg)}100%{transform:translate(var(--dx),var(--dy)) rotate(var(--rotate))}}
+@keyframes constellation-entry{0%{opacity:0;transform:translateY(85px) scale(.28) rotate(-17deg);filter:blur(16px)}70%{opacity:1;filter:blur(0)}100%{opacity:1;transform:translateY(0) scale(1) rotate(0);filter:blur(0)}}
