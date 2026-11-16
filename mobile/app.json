@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Huellitas de Luz",
+    "slug": "huellitas-de-luz",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "huellitas",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.huellitasdeluz.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0a1021",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.huellitasdeluz.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "react-native-reanimated"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

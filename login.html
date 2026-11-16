@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#090d1d" />
+  <meta name="description" content="Huellitas de Luz — Inicia sesión o crea tu cuenta." />
+  <title>Huellitas de Luz — Acceso</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="css/global.css" />
+  <link rel="stylesheet" href="css/login.css" />
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+</head>
+<body class="login-page">
+  <div class="login-wrap">
+    <div class="login-brand">
+      <span class="brand-icon">✦</span>
+      <span>huellitas<span class="brand-light">de luz</span></span>
+    </div>
+
+    <div class="login-card">
+      <!-- Tabs -->
+      <div class="login-tabs" role="tablist">
+        <button class="login-tab active" id="tab-login" role="tab" aria-selected="true" aria-controls="panel-login">Iniciar sesión</button>
+        <button class="login-tab" id="tab-register" role="tab" aria-selected="false" aria-controls="panel-register">Crear cuenta</button>
+      </div>
+
+      <!-- Panel login -->
+      <div id="panel-login" role="tabpanel" aria-labelledby="tab-login">
+        <form id="form-login" novalidate>
+          <div class="field-group">
+            <label for="login-email" class="mini-label">Correo electrónico</label>
+            <input id="login-email" type="email" class="login-input" placeholder="tu@correo.com" autocomplete="email" required />
+          </div>
+          <div class="field-group">
+            <label for="login-password" class="mini-label">Contraseña</label>
+            <input id="login-password" type="password" class="login-input" placeholder="••••••••" autocomplete="current-password" required />
+          </div>
+          <div class="login-error" id="login-error" role="alert" aria-live="polite"></div>
+          <button class="button button-primary button-wide login-submit" type="submit" id="login-btn">
+            <span class="button-label">Entrar</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Panel registro -->
+      <div id="panel-register" role="tabpanel" aria-labelledby="tab-register" hidden>
+        <form id="form-register" novalidate>
+          <div class="field-group">
+            <label for="reg-name" class="mini-label">Tu nombre</label>
+            <input id="reg-name" type="text" class="login-input" placeholder="Ej. María" autocomplete="name" maxlength="60" required />
+          </div>
+          <div class="field-group">
+            <label for="reg-email" class="mini-label">Correo electrónico</label>
+            <input id="reg-email" type="email" class="login-input" placeholder="tu@correo.com" autocomplete="email" required />
+          </div>
+          <div class="field-group">
+            <label for="reg-password" class="mini-label">Contraseña <small>(mínimo 8 caracteres)</small></label>
+            <input id="reg-password" type="password" class="login-input" placeholder="••••••••" autocomplete="new-password" minlength="8" required />
+          </div>
+          <div class="login-error" id="register-error" role="alert" aria-live="polite"></div>
+          <button class="button button-primary button-wide login-submit" type="submit" id="register-btn">
+            <span class="button-label">Crear cuenta</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <p class="login-footer">Tus mascotas quedan guardadas en tu cuenta y se sincronizan en todos tus dispositivos.</p>
+  </div>
+
+  <div class="login-bg" aria-hidden="true">
+    <div class="starfield"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </div>
+
+  <script>
+    // Si ya hay sesión, redirigir
+    if (isLoggedIn()) {
+      const next = new URLSearchParams(window.location.search).get('next') || '/index.html';
+      window.location.href = next;
+    }
+
+    // ─── Tabs ─────────────────────────────────────────────────────────────────
+    const tabs = document.querySelectorAll('.login-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+        tab.classList.add('active'); tab.setAttribute('aria-selected', 'true');
+        document.querySelectorAll('[role=tabpanel]').forEach(p => p.hidden = true);
+        document.getElementById(tab.getAttribute('aria-controls')).hidden = false;
+      });
+    });
+
+    function setLoading(btn, loading) {
+      btn.disabled = loading;
+      btn.querySelector('.button-label').textContent = loading ? 'Un momento…' : (btn.id === 'login-btn' ? 'Entrar' : 'Crear cuenta');
+    }
+
+    function showError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.style.display = msg ? 'block' : 'none';
+    }
+
+    function getRedirect() {
+      const next = new URLSearchParams(window.location.search).get('next');
+      return (next && next.startsWith('/')) ? next : '/index.html';
+    }
+
+    // ─── Login ────────────────────────────────────────────────────────────────
+    document.getElementById('form-login').addEventListener('submit', async e => {
+      e.preventDefault();
+      showError('login-error', '');
+      const btn      = document.getElementById('login-btn');
+      const email    = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      setLoading(btn, true);
+      try {
+        await apiLogin(email, password);
+        window.location.href = getRedirect();
+      } catch (err) {
+        showError('login-error', err.message);
+        setLoading(btn, false);
+      }
+    });
+
+    // ─── Registro ─────────────────────────────────────────────────────────────
+    document.getElementById('form-register').addEventListener('submit', async e => {
+      e.preventDefault();
+      showError('register-error', '');
+      const btn      = document.getElementById('register-btn');
+      const name     = document.getElementById('reg-name').value.trim();
+      const email    = document.getElementById('reg-email').value.trim();
+      const password = document.getElementById('reg-password').value;
+      if (password.length < 8) { showError('register-error', 'La contraseña debe tener al menos 8 caracteres.'); return; }
+      setLoading(btn, true);
+      try {
+        await apiRegister(email, password, name);
+        window.location.href = getRedirect();
+      } catch (err) {
+        showError('register-error', err.message);
+        setLoading(btn, false);
+      }
+    });
+  </script>
+</body>
+</html>

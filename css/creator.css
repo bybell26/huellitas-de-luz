@@ -1,4 +1,9 @@
 .page-wrap{width:min(1260px,calc(100% - 52px));margin:auto}
+/* Usuario y sala */
+.user-menu{display:flex;align-items:center;gap:10px}
+.user-name{font-size:12px;font-weight:700;color:#a0b4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.room-badge{font-size:11px;font-weight:800;color:#87efd5;background:#173530;border:1px solid #3a7164;border-radius:20px;padding:5px 11px;letter-spacing:.3px;white-space:nowrap}
+.room-badge:empty{display:none}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 0;border-bottom:1px solid #2a365044}
 .header-actions{display:flex;align-items:center;gap:18px}
 .status{display:flex;align-items:center;gap:9px;color:#bac7db;font-size:12px;font-weight:720;white-space:nowrap}

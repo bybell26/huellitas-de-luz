@@ -1,0 +1,47 @@
+{
+  "name": "Huellitas de Luz",
+  "short_name": "Huellitas",
+  "description": "Crea mascotas digitales y envíalas a una constelación compartida en tiempo real.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#090d1d",
+  "theme_color": "#090d1d",
+  "orientation": "portrait-primary",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "assets/screenshots/screenshot-creator.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "label": "Estación de creación"
+    },
+    {
+      "src": "assets/screenshots/screenshot-display.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "label": "Constelación"
+    }
+  ],
+  "categories": ["entertainment", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Crear mascota",
+      "url": "/index.html",
+      "description": "Ir al creador de mascotas"
+    }
+  ]
+}

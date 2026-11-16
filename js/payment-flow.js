@@ -4,7 +4,13 @@ function createPaymentFlow(onUpdate, options = {}) {
   const schedule = options.schedule || setTimeout;
   const cancel = options.cancel || clearTimeout;
   const request = options.request || (async (body, signal) => {
-    const response = await fetch('/api/pey', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), signal});
+    // Incluir JWT si hay sesión activa (requerido por el nuevo backend)
+    const token = (typeof getToken === 'function') ? getToken() : null;
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    // En desarrollo apunta al backend en :4000; en producción al mismo origen
+    const base = (typeof API_BASE !== 'undefined') ? API_BASE : '';
+    const response = await fetch(base + '/api/pey', { method: 'POST', headers, body: JSON.stringify(body), signal });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error('No se pudo consultar Pey.');
     return result.data;

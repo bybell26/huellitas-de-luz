@@ -4,26 +4,52 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#070b1a" />
-  <meta name="description" content="Constelación interactiva de mascotas flotando juntas de Órbita Pets." />
-  <title>Órbita Pets 3.0 — Constelación flotante</title>
+  <meta name="description" content="Huellitas de Luz — Constelación interactiva de mascotas." />
+  <title>Huellitas de Luz — Constelación</title>
+  <link rel="manifest" href="/manifest.json" />
   <link rel="stylesheet" href="css/global.css" />
   <link rel="stylesheet" href="css/display.css" />
+  <!-- Sin requireSession: la pantalla de exhibición es pública (no requiere login) -->
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
   <script src="js/pets.js" defer></script>
   <script src="js/storage.js" defer></script>
-  <script src="js/sync.js" defer></script>
+  <script src="js/ws.js" defer></script>
   <script src="js/animations.js" defer></script>
   <script src="js/display.js" defer></script>
 </head>
 <body class="display-page">
-  <header class="display-topbar"><div class="brand display-brand"><span class="brand-icon">✦</span><span>órbita<span class="brand-light">pets</span><small>PANTALLA 2 · EXHIBICIÓN</small></span></div><div class="display-top-actions"><span class="display-connected" id="display-connected">● Exhibición conectada</span><span class="display-counter" id="display-counter">0 mascotas</span><button class="button button-ghost" type="button" id="toggle-names">Ocultar nombres</button><button class="button button-ghost" type="button" id="display-pause">Ⅱ Pausar</button><button class="button button-ghost" id="go-fullscreen" type="button">⛶ Pantalla completa</button></div></header>
+  <header class="display-topbar">
+    <div class="brand display-brand">
+      <span class="brand-icon">✦</span>
+      <span>huellitas<span class="brand-light">de luz</span><small>CONSTELACIÓN · <span id="display-room-code"></span></small></span>
+    </div>
+    <div class="display-top-actions">
+      <span class="display-connected" id="display-connected">○ Conectando…</span>
+      <span class="display-counter" id="display-counter">0 mascotas</span>
+      <button class="button button-ghost" type="button" id="toggle-names">Ocultar nombres</button>
+      <button class="button button-ghost" type="button" id="display-pause">Ⅱ Pausar</button>
+      <button class="button button-ghost" id="go-fullscreen" type="button">⛶ Pantalla completa</button>
+    </div>
+  </header>
+
   <main class="screen-stage" id="stage" aria-live="polite">
     <div class="starfield" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="cosmic-halo" aria-hidden="true"></div><div class="cosmic-ring ring-a" aria-hidden="true"></div><div class="cosmic-ring ring-b" aria-hidden="true"></div>
-    <div id="arrival-content" class="arrival-content"><div class="waiting-mark">🐾</div><h1 class="waiting-title">La constelación te espera</h1><p class="waiting-subtitle">Crea tu primera mascota desde el monitor 1 para comenzar a llenar el universo.</p></div>
+    <div class="cosmic-halo" aria-hidden="true"></div>
+    <div class="cosmic-ring ring-a" aria-hidden="true"></div>
+    <div class="cosmic-ring ring-b" aria-hidden="true"></div>
+    <div id="arrival-content" class="arrival-content">
+      <div class="waiting-mark">🐾</div>
+      <h1 class="waiting-title">La constelación te espera</h1>
+      <p class="waiting-subtitle">Crea tu primera mascota desde la estación para comenzar a llenar el universo.</p>
+    </div>
     <div id="constellation" class="constellation" aria-label="Mascotas flotantes"></div>
-    
     <div class="arrival-message" id="arrival-message" aria-live="polite"></div>
   </main>
-  <div class="display-footer"><span>✦ Todas las mascotas, un mismo universo</span><span>Esc para salir de pantalla completa</span></div>
+
+  <div class="display-footer">
+    <span>✦ Todas las mascotas, un mismo universo</span>
+    <span>Esc para salir de pantalla completa</span>
+  </div>
 </body>
 </html>
