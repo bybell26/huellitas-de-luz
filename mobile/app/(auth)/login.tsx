@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiLogin, apiRegister } from '../../lib/api';
 import Button from '../../components/Button';
 import Input  from '../../components/Input';
-import { Colors, FontSize, Radius } from '../../constants/theme';
+import { Colors, FontSize } from '../../constants/theme';
 
 type Tab = 'login' | 'register';
 

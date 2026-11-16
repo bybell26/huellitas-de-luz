@@ -51,3 +51,37 @@ CREATE TABLE IF NOT EXISTS room_pets (
 );
 
 CREATE INDEX IF NOT EXISTS room_pets_room_id_idx ON room_pets(room_id);
+
+-- Cobros por cuenta y recibos verificados exclusivamente por el servidor.
+CREATE TABLE IF NOT EXISTS payment_requests (
+  qr_id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS payment_receipts (
+  transaction_id TEXT PRIMARY KEY,
+  qr_id TEXT NOT NULL REFERENCES payment_requests(qr_id),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount NUMERIC(12,2) NOT NULL CHECK (amount = 0.01),
+  currency TEXT NOT NULL CHECK (currency = 'MXN'),
+  redeemed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Ampliaciones idempotentes: apariencia y donaciones adicionales por mascota.
+ALTER TABLE pets ADD COLUMN IF NOT EXISTS appearance JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS amount NUMERIC(12,2) NOT NULL DEFAULT 0.01;
+ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS purpose TEXT NOT NULL DEFAULT 'creation';
+ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS pet_id TEXT;
+ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS trick TEXT;
+ALTER TABLE payment_receipts DROP CONSTRAINT IF EXISTS payment_receipts_amount_check;
+ALTER TABLE payment_receipts ADD CONSTRAINT payment_receipts_amount_check CHECK (amount >= 0.01 AND amount <= 1000);
+CREATE TABLE IF NOT EXISTS pet_donations (
+  id UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
+  transaction_id TEXT PRIMARY KEY REFERENCES payment_receipts(transaction_id),
+  pet_id TEXT NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  trick TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS pet_donations_pet_idx ON pet_donations(pet_id);

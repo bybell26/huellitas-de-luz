@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "migrate": "node src/db/migrate.js"
+    "migrate": "node src/db/migrate.js",
+    "test": "node --test test/*.test.js",
+    "reset-password": "node scripts/reset-password.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

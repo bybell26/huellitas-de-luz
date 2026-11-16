@@ -226,3 +226,53 @@ footer{color:#7589ac;text-align:center;font-size:10px;padding:0 0 22px}
 @media(hover:hover){.breed-choice:hover .pet-thumbnail{transform:translateY(-2px) rotate(-3deg)}}
 @media(max-width:390px){.breed-choice{min-height:132px;padding:23px 5px 10px}.breed-choice .pet-thumbnail{width:78px}.breed-choice strong{font-size:10px}.breed-badge{font-size:7px;padding:2px 4px;left:5px}}
 @media(prefers-reduced-motion:reduce){.breed-choice:hover .pet-thumbnail{transform:none}}
+
+/* La exhibición vive dentro de la página; dialog conserva foco y cierre con Escape. */
+body.constellation-modal-open { overflow:hidden; }
+.constellation-modal {
+  width:min(1320px,calc(100vw - 32px)); height:min(860px,calc(100dvh - 32px));
+  max-width:none; max-height:none; padding:0; margin:auto; color:#eef2ff;
+  border:1px solid #7180ad66; border-radius:22px; background:#0b1225;
+  box-shadow:0 30px 100px #0009; overflow:hidden;
+}
+.constellation-modal::backdrop { background:#04091ccc; backdrop-filter:blur(6px); }
+.constellation-modal[open] { display:flex; flex-direction:column; }
+.constellation-modal-header { flex:none; display:flex; justify-content:space-between; align-items:center; gap:16px; padding:14px 20px; border-bottom:1px solid #7180ad33; }
+.constellation-modal-header h2 { margin:0; font-size:16px; }
+.constellation-modal-header p { margin:3px 0 0; color:#9fb1cf; font-size:11px; }
+.constellation-modal iframe { display:block; border:0; width:100%; flex:1; min-height:0; background:#070b18; }
+@media(max-width:650px) {
+  .constellation-modal { width:100vw; height:100dvh; border:0; border-radius:0; }
+  .constellation-modal-header { padding:12px; }
+}
+
+.display-page[data-scene="garden"],.display-page[data-scene="park"]{background:#375c49}
+.screen-stage{background-size:cover;background-position:center}
+.display-page:not([data-scene="constellation"]) .starfield,.display-page:not([data-scene="constellation"]) .cosmic-halo,.display-page:not([data-scene="constellation"]) .cosmic-ring{display:none}
+.display-page[data-scene="garden"] .display-topbar,.display-page[data-scene="park"] .display-topbar{background:#122d2cda}
+.scene-picker{display:flex;align-items:center;gap:6px;color:#e8f5e9;font-size:11px}
+.scene-picker select{max-width:125px;background:#22344c;color:#fff;border:1px solid #7182a4;border-radius:10px;padding:8px}
+.display-top-actions{flex-wrap:wrap;justify-content:flex-end}
+.scene-dialog{width:min(600px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:22px;border:1px solid #788db5;border-radius:22px;background:#142038;color:#f2f5ff}
+.scene-dialog::backdrop{background:#03091dcc;backdrop-filter:blur(5px)}
+.scene-dialog header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.scene-dialog h2{font-size:20px;margin:0}
+.scene-dialog label{display:grid;gap:6px;font-size:12px;margin:12px 0}
+.scene-dialog input:not([type="checkbox"]),.scene-dialog select{width:100%;background:#0c172b;border:1px solid #7182a4;border-radius:10px;padding:11px;color:#fff;font:inherit}
+.scene-dialog .inline-choice{display:flex;align-items:center}
+.scene-dialog fieldset{border:1px solid #7182a455;border-radius:12px;padding:10px;max-height:180px;overflow:auto}
+.scene-dialog fieldset label{display:flex;align-items:center;gap:10px}
+.wallpaper-select-actions{display:flex;gap:16px;margin-bottom:8px}
+.wallpaper-select-actions button{background:none;border:0;color:#b9d6fd;text-decoration:underline}
+#wallpaper-preview{display:block;max-width:100%;max-height:260px;height:auto;width:auto;margin:16px auto;border-radius:12px}
+#wallpaper-status{font-size:12px;color:#bad1e4}
+.appearance-options{margin:16px 0;padding:15px;border:1px solid #536783;border-radius:14px;font-size:13px}
+.appearance-options summary{cursor:pointer;font-weight:750}
+.appearance-options p{color:#b2c2d5;font-size:12px}
+.appearance-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+.appearance-grid label{display:grid;gap:6px}
+.appearance-grid select{background:#101d33;color:#f4f5ff;border:1px solid #617392;border-radius:9px;padding:10px;width:100%}
+.pet-actions{display:flex;justify-content:center;gap:5px;margin:6px auto 0}
+.pet-actions button{border:1px solid #9baed366;background:#142038df;color:#e7f4ff;border-radius:12px;font-size:10px;padding:6px 9px;cursor:pointer}
+.pet-actions button:hover{background:#34486a}
+@media(max-width:650px){.display-topbar{align-items:flex-start}.display-top-actions{max-width:100%;gap:5px}.scene-picker{font-size:10px}}

@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import jwt from 'jsonwebtoken';
+import pool from '../db/pool.js';
 
 /**
  * Mapa de salas activas: roomCode → Set<WebSocket>
@@ -88,6 +89,18 @@ export function attachWebSocket(server) {
       try {
         const msg = JSON.parse(raw);
         if (msg?.type === 'ping') ws.send(JSON.stringify({ type: 'pong' }));
+        if (['pause', 'labels', 'replay'].includes(msg?.type) && userId) {
+          const valid = msg.type === 'pause' ? typeof msg.paused === 'boolean'
+            : msg.type === 'labels' ? typeof msg.visible === 'boolean'
+            : typeof msg.id === 'string' && /^pey-[A-Za-z0-9_-]+$/.test(msg.id);
+          if (!valid) return;
+          pool.query('SELECT owner_id FROM rooms WHERE code = $1', [code]).then(result => {
+            if (ws.readyState !== WebSocket.OPEN || result.rows[0]?.owner_id !== userId) return;
+            const message = msg.type === 'pause' ? { type: 'pause', paused: msg.paused }
+              : msg.type === 'labels' ? { type: 'labels', visible: msg.visible } : { type: 'replay', id: msg.id };
+            broadcast(code, message);
+          }).catch(err => console.error('[ws/control]', err.message));
+        }
       } catch { /* ignorar mensajes malformados */ }
     });
 

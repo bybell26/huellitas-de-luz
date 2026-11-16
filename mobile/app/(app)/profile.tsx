@@ -13,8 +13,8 @@ import * as SecureStore from 'expo-secure-store';
 import Button from '../../components/Button';
 import Card   from '../../components/Card';
 import { useAuth }     from '../../hooks/useAuth';
-import { apiGetRooms, apiGetPets, clearSession, type Room, type Pet } from '../../lib/api';
-import { Colors, FontSize } from '../../constants/theme';
+import { apiGetRooms, apiGetPets, type Room, type Pet } from '../../lib/api';
+import { Colors } from '../../constants/theme';
 
 const ROOM_KEY = 'huellitas_room_code';
 

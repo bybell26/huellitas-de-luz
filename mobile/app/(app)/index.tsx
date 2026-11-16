@@ -5,27 +5,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, Platform,
+  TextInput, Alert, ActivityIndicator, Image,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { ensureOwnRoom } from '../../lib/active-room';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import PetSVG from '../../components/PetSVG';
 import Button  from '../../components/Button';
 import Card    from '../../components/Card';
-import { BREEDS, COLORS, MAX_PETS, getBreed, labelFor, type Species } from '../../constants/pets';
-import { Colors, FontSize, Radius } from '../../constants/theme';
+import { BREEDS, COLORS, MAX_PETS, getBreed, type Species } from '../../constants/pets';
+import { Colors } from '../../constants/theme';
 import { useRoom }  from '../../hooks/useRoom';
 import { useAuth }  from '../../hooks/useAuth';
 import { createPaymentFlow, type PaymentStatus } from '../../lib/payment';
-import {
-  apiCreateRoom, apiGetRoom, apiGetRooms,
-  clearSession, type Pet,
-} from '../../lib/api';
-import * as SecureStore from 'expo-secure-store';
-
-const ROOM_KEY = 'huellitas_room_code';
+import { type Pet } from '../../lib/api';
 
 type Step = 'create' | 'review' | 'payment' | 'sent';
 
@@ -39,41 +34,33 @@ interface CreatorState {
 export default function CreatorScreen() {
   const { user }                = useAuth();
   const [roomCode, setRoomCode] = useState<string | null>(null);
-  const { pets, addPet, removePet, clearAll } = useRoom(roomCode);
+  const { pets, addPet, isLoading, error: roomError } = useRoom(roomCode);
 
   const [step,    setStep]    = useState<Step>('create');
   const [creator, setCreator] = useState<CreatorState>({
     species: null, breed: null, collar: COLORS[0].value, name: '',
   });
   const [payStatus,  setPayStatus]  = useState<PaymentStatus | null>(null);
-  const [lastPetId,  setLastPetId]  = useState<string | null>(null);
+  const [, setLastPetId]  = useState<string | null>(null);
   const [savingPet,  setSavingPet]  = useState(false);
 
   // ── Sala ──────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    (async () => {
-      try {
-        const stored = await SecureStore.getItemAsync(ROOM_KEY);
-        if (stored) {
-          try { await apiGetRoom(stored); setRoomCode(stored); return; } catch {}
-        }
-        const rooms = await apiGetRooms();
-        if (rooms.length > 0) {
-          await SecureStore.setItemAsync(ROOM_KEY, rooms[0].code);
-          setRoomCode(rooms[0].code);
-        } else {
-          const room = await apiCreateRoom('Mi constelación');
-          await SecureStore.setItemAsync(ROOM_KEY, room.code);
-          setRoomCode(room.code);
-        }
-      } catch (e) {
-        console.warn('Error al preparar sala:', e);
+  useFocusEffect(useCallback(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    void ensureOwnRoom().then(code => {
+      if (!cancelled) setRoomCode(code);
+    }).catch(err => {
+      if (!cancelled) {
+        setRoomCode(null);
+        Alert.alert('No se pudo preparar la sala', err instanceof Error ? err.message : 'Revisa la conexión.');
       }
-    })();
-  }, []);
+    });
+    return () => { cancelled = true; };
+  }, [user?.id]));
 
   const isFull     = pets.length >= MAX_PETS;
-  const canContinue = !!creator.species && !!creator.breed && !isFull;
+  const canContinue = !!creator.species && !!creator.breed && !!roomCode && !isLoading && !roomError && !isFull;
 
   // ── Paso 1: Diseña ────────────────────────────────────────────────────────
   function renderCreate() {
@@ -203,7 +190,14 @@ export default function CreatorScreen() {
   // ── Paso 3: Pago ──────────────────────────────────────────────────────────
   const [flow, setFlow] = useState<ReturnType<typeof createPaymentFlow> | null>(null);
 
+  useEffect(() => () => flow?.dispose(), [flow]);
+
   function beginPayment() {
+    if (!roomCode || isLoading || roomError || isFull) {
+      Alert.alert('Sala no disponible', 'Espera a que la sala esté lista y tenga espacio antes de pagar.');
+      return;
+    }
+    flow?.dispose();
     const pf = createPaymentFlow((update) => {
       setPayStatus(update);
       if (update.status === 'paid') {
@@ -255,7 +249,7 @@ export default function CreatorScreen() {
           <StepHeader step={3} title="Escanea y paga $0.01 MXN" subtitle="Abre tu app bancaria y autoriza el cobro." />
           <Card style={styles.cardSection}>
             {/* En RN mostramos el QR como imagen base64 con expo-image o Image */}
-            <Text style={styles.qrPlaceholder}>📱</Text>
+            <Image source={{ uri: p.qr.qrImage }} style={{ width: 240, height: 240, alignSelf: 'center' }} resizeMode="contain" accessibilityLabel="QR CoDi para pagar un centavo" />
             <Text style={styles.payText}>QR generado. Escanéalo con tu app bancaria.</Text>
             <Text style={styles.paySubText}>ID: {p.qr.id}</Text>
           </Card>
@@ -429,7 +423,7 @@ const styles = StyleSheet.create({
 
   // Form sections
   cardSection: { marginHorizontal: 20, marginTop: 12 },
-  fieldLabel:  { fontSize: 12, fontWeight: '850', color: Colors.text, marginBottom: 10 },
+  fieldLabel:  { fontSize: 12, fontWeight: '800', color: Colors.text, marginBottom: 10 },
   fieldIndex:  { color: Colors.violet, marginRight: 6 },
 
   // Species

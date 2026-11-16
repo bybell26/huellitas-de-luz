@@ -7,7 +7,7 @@ import Svg, {
   Defs, LinearGradient, RadialGradient, Stop,
   Ellipse, Path, Circle, Rect, Text as SvgText, G,
 } from 'react-native-svg';
-import { BREEDS, COLORS, getBreed, Species } from '../constants/pets';
+import { COLORS, getBreed, Species } from '../constants/pets';
 
 let svgSerial = 0;
 

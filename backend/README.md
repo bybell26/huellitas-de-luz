@@ -90,3 +90,37 @@ Conectar: `ws://localhost:4000/ws?room=abc-1234&token=JWT`
 | `PORT` | Puerto del servidor (default: `4000`) |
 | `PEY_API_KEY` | API key de Pey |
 | `ALLOWED_ORIGINS` | Orígenes CORS separados por coma |
+
+## Recibos de pago
+
+Después de actualizar, ejecuta `npm run migrate` para agregar `payment_requests` y
+`payment_receipts` sin borrar los datos existentes. Las consultas de cobros solo
+se permiten a la cuenta que creó el QR. `/api/pets` requiere un recibo aprobado
+registrado por el servidor y lo consume de forma atómica. No se aceptan IDs de
+transacciones inventados ni recibos de otras cuentas.
+
+`npm test` usa PostgreSQL con un esquema temporal separado y Pey simulado. No
+modifica las tablas de la aplicación ni genera cobros reales.
+
+## Restablecer acceso local
+
+La contraseña original no se puede recuperar: se almacena con bcrypt. Desde
+`backend/`, ejecuta `npm run reset-password -- correo@ejemplo.com` para generar
+una nueva contraseña aleatoria y conservar la cuenta y sus mascotas. El comando
+solo funciona con acceso local a la base; no hay un endpoint público de reset.
+
+La clave de Pey debe configurarse en `backend/.env` como `PEY_API_KEY`. También
+se admite el archivo privado `pruebas-pey/config.local.json`; un valor de ejemplo
+en `.env` ya no bloquea ese fallback. Reinicia el backend después de cambiar
+`.env`. Ambos archivos privados están excluidos de Git.
+
+## Donaciones adicionales
+
+`POST /api/pey` con `action: create`, `purpose: extra`, `petId`, `amount` y
+`trick` crea un cobro específico. Se admiten `paw`/`spin` para perro y
+`stand`/`yarn` para gato. El monto admite de $0.01 a $1,000 MXN con dos decimales.
+El destino y truco se guardan en `payment_requests`; cada transacción PAID se
+consume una sola vez en `pet_donations`. El evento `donation_added` se emite tras
+persistir y el estado incluye un identificador estable para deduplicar el truco.
+Las consultas de sala incluyen el total original más las donaciones extra.
+Ejecuta `npm run migrate` antes de iniciar esta versión.

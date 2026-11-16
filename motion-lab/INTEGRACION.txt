@@ -1,0 +1,36 @@
+HUELLITAS DE LUZ — MOVIMIENTO NATURAL
+====================================
+Trabajo aislado: esta carpeta no cambia archivos de Kiro, backend, pagos ni mobile.
+
+Vista previa
+Abre motion-lab/index.html directamente en Chrome o Edge; no necesita servidor,
+sesion ni conexion. Puedes filtrar las 12 razas y pausar/reanudar los gestos.
+
+Integracion opcional para Kiro (no aplicada)
+1. Incluir motion-lab/motion.css en la pagina que muestre mascotas.
+2. Cargar motion-lab/pets-motion.js antes del codigo que solicita dibujos.
+3. En el punto de render elegido:
+   HuellitasMotion.render(species, breedId, collarColor, name)
+   devuelve un SVG animado como string, con la misma forma de argumentos de petSVG.
+   No sustituye petSVG ni registra variables globales de razas o colores.
+4. La clase existente .is-paused en un ancestro pausa todas las partes.
+   Tambien se admite data-motion-paused="true" en un ancestro o en el SVG.
+5. prefers-reduced-motion: reduce desactiva los movimientos automaticamente.
+
+El renderer es una copia independiente del dibujo actual: si Kiro cambia las
+razas o la geometria, hay que reconciliar esa copia antes de integrarla.
+Este trabajo es para SVG en navegador; no es directamente un componente nativo.
+
+Movimiento
+- Respiracion en el torso, patas apoyadas.
+- Cabeza con inclinaciones pequenas y pausas.
+- Parpadeos y orejas independientes.
+- Perros: meneo de cola en pequenas rafagas.
+- Gatos: balanceo lento y parpadeo relajado.
+- Medalla con oscilacion sutil.
+- Tiempos distintos por mascota; sin bucles JavaScript ni observadores.
+
+Verificacion
+browser-check.html ejecuta comprobaciones reales del DOM y de animaciones CSS
+en el navegador. Al abrirlo debe mostrar PASS. Tambien admite la preferencia
+de movimiento reducido del sistema o su emulacion en DevTools.

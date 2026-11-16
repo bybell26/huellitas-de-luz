@@ -115,7 +115,8 @@ async function deleteAvatar(id, roomCode) {
   if (roomCode) {
     await apiRemovePetFromRoom(roomCode, id);
   }
-  await apiDeletePet(id);
+  // Retirar de la sala conserva la mascota en la cuenta.
+  if (!roomCode) await apiDeletePet(id);
   _cache = _cache.filter(p => p.id !== id);
   return readRoster();
 }
@@ -139,7 +140,8 @@ function addAvatar(raw) {
   const slot = Array.from({ length: MAX_PETS }, (_, i) => i)
     .find(i => !_cache.some(p => p.slot === i));
 
-  const avatar = { ...raw, slot: slot ?? _cache.length };
+  const validSlot = Number.isInteger(raw.slot) && raw.slot >= 0 && raw.slot < MAX_PETS;
+  const avatar = { ...raw, slot: validSlot ? raw.slot : (slot ?? _cache.length) };
   _cache = [..._cache, avatar];
   return avatar;
 }
@@ -151,4 +153,26 @@ function removeAvatar(id) {
 
 function clearRoster() {
   _cache = [];
+}
+
+// Cada evento invalida la consulta pendiente. No publicar una foto anterior al evento.
+function createRosterSync(getRoom, onChange) {
+  let revision = 0;
+  let running = null;
+  return function refresh() {
+    revision++;
+    if (running) return running;
+    running = (async () => {
+      let observed;
+      do {
+        observed = revision;
+        const data = await apiGetRoom(getRoom());
+        if (observed === revision) {
+          _cache = (data.pets || []).slice(0, MAX_PETS);
+          onChange();
+        }
+      } while (observed !== revision);
+    })().catch(err => console.warn('[sync]', err.message)).finally(() => { running = null; });
+    return running;
+  };
 }

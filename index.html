@@ -9,13 +9,17 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="stylesheet" href="css/global.css" />
   <link rel="stylesheet" href="css/creator.css" />
+  <link rel="stylesheet" href="css/pet-motion.css" />
   <!-- Orden importante: auth y api primero, luego lógica de dominio -->
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script src="js/pets.js" defer></script>
+  <script src="js/pet-appearance.js" defer></script>
+  <script src="js/pets-motion.js" defer></script>
   <script src="js/storage.js" defer></script>
   <script src="js/ws.js" defer></script>
   <script src="js/payment-flow.js" defer></script>
+  <script src="js/display-modal.js" defer></script>
   <script src="js/app.js" defer></script>
 </head>
 <body class="creator-page">
@@ -23,15 +27,15 @@
     <header class="topbar">
       <a href="index.html" class="brand" aria-label="Huellitas de Luz, inicio">
         <span class="brand-icon">✦</span>
-        <span>huellitas<span class="brand-light">de luz</span><small>ESTUDIO DIGITAL DE MASCOTAS</small></span>
+        <span>huellitas <span class="brand-light"> de luz</span><small>ESTUDIO DIGITAL DE MASCOTAS</small></span>
       </a>
       <div class="header-actions">
         <span class="status" id="display-status" role="status" aria-live="polite">
           <span class="status-dot"></span>
-          <span id="status-text">Conectando…</span>
+          <span id="status-text">Constelación cerrada</span>
         </span>
         <span class="room-badge" id="room-code" title="Código de sala"></span>
-        <button class="button button-ghost" id="open-display" type="button">↗ Abrir constelación</button>
+        <button class="button button-ghost" id="open-display" type="button" aria-haspopup="dialog" aria-controls="constellation-modal" aria-expanded="false">✦ Ver constelación</button>
         <div class="user-menu">
           <span class="user-name" id="user-name"></span>
           <button class="button button-ghost button-small" id="logout" type="button">Salir</button>
@@ -84,6 +88,15 @@
     <footer>Huellitas de Luz · Ilustraciones originales en 2D · Sin fotografías · Hasta 42 mascotas por constelación</footer>
   </div>
 
+
+  <dialog id="constellation-modal" class="constellation-modal" aria-labelledby="constellation-modal-title">
+    <header class="constellation-modal-header">
+      <div><h2 id="constellation-modal-title">Tu constelación</h2><p>Todas tus mascotas, juntas y en vivo.</p></div>
+      <button id="close-constellation" class="button button-ghost" type="button" autofocus aria-label="Cerrar constelación">✕ Cerrar</button>
+    </header>
+    <iframe id="constellation-frame" title="Constelación de mascotas en vivo" allow="fullscreen"></iframe>
+  </dialog>
+
   <div class="loading-overlay" id="loading" aria-live="polite" aria-hidden="true">
     <div class="loading-inner">
       <div class="big-paw">🐾</div>
@@ -97,7 +110,7 @@
   <script>
     // Service Worker para PWA
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
     }
   </script>
 </body>

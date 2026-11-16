@@ -3,7 +3,7 @@ import { Species } from '../constants/pets';
 
 // En desarrollo apunta al backend local.
 // En producción cambia esta URL a tu servidor desplegado.
-const API_BASE = 'http://localhost:4000';
+import { getApiBase } from './config';
 
 export const TOKEN_KEY = 'huellitas_token';
 export const USER_KEY  = 'huellitas_user';
@@ -21,6 +21,7 @@ export async function getStoredUser(): Promise<User | null> {
 }
 
 async function saveSession(token: string, user: User): Promise<void> {
+  await clearSession();
   await SecureStore.setItemAsync(TOKEN_KEY, token);
   await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
 }
@@ -28,6 +29,7 @@ async function saveSession(token: string, user: User): Promise<void> {
 export async function clearSession(): Promise<void> {
   await SecureStore.deleteItemAsync(TOKEN_KEY);
   await SecureStore.deleteItemAsync(USER_KEY);
+  await SecureStore.deleteItemAsync('huellitas_room_code');
 }
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -67,9 +69,12 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const response = await fetch(API_BASE + path, { ...options, headers });
+  const response = await fetch(getApiBase() + path, { ...options, headers });
   const data = await response.json().catch(() => ({}));
 
+  if (response.status === 401 && token) {
+    await handleUnauthorized();
+  }
   if (!response.ok) {
     throw new Error((data as any).error ?? `Error ${response.status}`);
   }
@@ -149,4 +154,10 @@ export async function apiRemovePetFromRoom(roomCode: string, petId: string): Pro
 
 export async function apiClearRoom(roomCode: string): Promise<void> {
   await apiFetch(`/api/rooms/${encodeURIComponent(roomCode)}`, { method: 'DELETE' });
+}
+
+export async function handleUnauthorized(): Promise<void> {
+  await clearSession();
+  const { router } = await import('expo-router');
+  router.replace('/(auth)/login');
 }

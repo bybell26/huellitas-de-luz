@@ -1,6 +1,7 @@
 'use strict';
 function createPaymentFlow(onUpdate, options = {}) {
   const now = options.now || Date.now;
+  const expectedAmount = options.amount ?? .01;
   const schedule = options.schedule || setTimeout;
   const cancel = options.cancel || clearTimeout;
   const request = options.request || (async (body, signal) => {
@@ -11,8 +12,17 @@ function createPaymentFlow(onUpdate, options = {}) {
     // En desarrollo apunta al backend en :4000; en producción al mismo origen
     const base = (typeof API_BASE !== 'undefined') ? API_BASE : '';
     const response = await fetch(base + '/api/pey', { method: 'POST', headers, body: JSON.stringify(body), signal });
-    const result = await response.json();
-    if (!response.ok || !result.ok) throw new Error('No se pudo consultar Pey.');
+    if (response.status === 401 && token && typeof clearSession === 'function') {
+      clearSession();
+      requireSession();
+    }
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) {
+      const message = typeof result.error === 'string' ? result.error
+        : typeof result.error?.message === 'string' ? result.error.message
+        : 'No se pudo consultar Pey. Revisa la conexión con el backend.';
+      throw new Error(message);
+    }
     return result.data;
   });
   let qr = null, deadline = 0, timer, timeout, controller, finished = false;
@@ -36,7 +46,7 @@ function createPaymentFlow(onUpdate, options = {}) {
         const data = await request({action: 'status', id: qr.id, nextToken}, controller.signal);
         if (finished) return;
         if (now() >= deadline) return reject();
-        const paid = (data.items || []).find(item => item.status === 'PAID' && Number(item.amount) === 0.01 && (!item.currency || item.currency === 'MXN'));
+        const paid = (data.items || []).find(item => item.status === 'PAID' && Number(item.amount) === expectedAmount && (!item.currency || item.currency === 'MXN'));
         if (paid) return finish('paid', {transaction: paid});
         nextToken = data.nextToken;
         if (nextToken && seen.has(nextToken)) throw new Error('Paginación repetida.');
@@ -55,15 +65,18 @@ function createPaymentFlow(onUpdate, options = {}) {
       controller = new AbortController();
       const createTimeout = schedule(() => controller.abort(), 30000);
       try {
-        qr = await request({action: 'create'}, controller.signal);
+        qr = options.qr || await request({...options.createBody, action: 'create'}, controller.signal);
         if (finished) return;
         if (!qr?.id || typeof qr.qrImage !== 'string') throw new Error('QR sin imagen.');
         const image = qr.qrImage.replace(/^data:image\/png;base64,/, '');
         if (!image || !/^[A-Za-z0-9+/=\s]+$/.test(image)) throw new Error('Imagen inválida.');
         qr.qrImage = 'data:image/png;base64,' + image;
         onUpdate({status: 'qr', qr});
-      } catch {
-        if (!finished) finish('error', {message: 'No fue posible preparar el QR. Si Pey recibió la solicitud, el QR podría haberse creado; no se confirmó ningún pago.'});
+      } catch (error) {
+        const message = error?.name === 'AbortError'
+          ? 'Pey tardó demasiado en responder. El CoDi podría haberse creado; revisa antes de generar otro.'
+          : error?.message || 'No fue posible preparar el QR.';
+        if (!finished) finish('error', {message});
       } finally { cancel(createTimeout); }
     },
     validate() {

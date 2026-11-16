@@ -25,6 +25,10 @@ async function apiFetch(path, options = {}) {
   const response = await fetch(API_BASE + path, { ...options, headers });
   const data = await response.json().catch(() => ({}));
 
+  if (response.status === 401 && token) {
+    clearSession();
+    requireSession();
+  }
   if (!response.ok) {
     throw new Error(data.error || `Error ${response.status}`);
   }

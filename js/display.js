@@ -17,8 +17,11 @@ const roomCodeEl    = document.getElementById('display-room-code');
 let announcementTimer = null;
 let roomSocket        = null;
 let activeRoom        = null;
+let displayHeartbeat = null;
 
+const syncRoster = createRosterSync(() => activeRoom, renderConstellation);
 const slots = buildSlots();
+const roaming = createPetRoaming(constellation, document.getElementById('pet-details'));
 
 // ─── Inicialización ───────────────────────────────────────────────────────────
 async function init() {
@@ -36,6 +39,7 @@ async function init() {
   // Cargar mascotas iniciales desde la API (sin auth requerida)
   try {
     const data = await apiGetRoom(activeRoom);
+    clearRoster();
     _injectRoster(data.pets || []);
     renderConstellation();
   } catch (err) {
@@ -47,9 +51,13 @@ async function init() {
 
   // Heartbeat para que el creador sepa que la pantalla está viva
   setDisplayOnline(activeRoom);
-  setInterval(() => setDisplayOnline(activeRoom), 1800);
+  displayHeartbeat = setInterval(() => setDisplayOnline(activeRoom), 1800);
 
   updateAnimationSettings();
+  const tools=HuellitasScenes.setup({getRoster:readRoster,getRoom:()=>activeRoom});
+  setupPetDonations({getRoster:readRoster,onPaid:()=>syncRoster()});
+  const wanted=new URLSearchParams(location.search).get('wallpaper');
+  if(wanted)tools.open(wanted==='all'?null:wanted);
 }
 
 function _injectRoster(pets) {
@@ -68,15 +76,20 @@ function connectSocket() {
 
 function handleWsMessage(msg) {
   if (!msg?.type) return;
+  if (['pet_added', 'pet_removed', 'room_cleared', 'donation_added'].includes(msg.type)) syncRoster();
 
   switch (msg.type) {
     case '_connected':
+      publishDisplayState('connected');
+      syncRoster();
       if (statusEl) statusEl.textContent = '● Constelación conectada';
       break;
     case '_disconnected':
+      publishDisplayState('disconnected');
       if (statusEl) statusEl.textContent = '○ Reconectando…';
       break;
     case '_failed':
+      publishDisplayState('disconnected');
       if (statusEl) statusEl.textContent = '✕ Sin conexión';
       break;
 
@@ -109,6 +122,9 @@ function handleWsMessage(msg) {
       updateAnimationSettings();
       break;
 
+    case 'donation_added':
+      PetTricks.play(msg);
+      break;
     case 'replay':
       if (msg.id) replay(msg.id);
       break;
@@ -146,6 +162,7 @@ function renderConstellation(newId = null) {
     }
   });
 
+  roaming.sync(roster);
   return roster;
 }
 
@@ -172,6 +189,7 @@ function replay(id) {
 
 function updateAnimationSettings() {
   constellation.classList.toggle('is-paused',     isPaused());
+  roaming.setPaused(isPaused());
   constellation.classList.toggle('hide-labels',   !labelsVisible());
   pauseButton.textContent  = isPaused()       ? '▶ Reanudar' : 'Ⅱ Pausar';
   labelsButton.textContent = labelsVisible()  ? 'Ocultar nombres' : 'Mostrar nombres';
@@ -218,5 +236,27 @@ window.addEventListener('resize', () => {
 // ─── Arranque ─────────────────────────────────────────────────────────────────
 init().catch(err => {
   console.error('[display] init falló:', err);
+  publishDisplayState('disconnected');
   announce('Error al cargar la constelación.');
+});
+
+function publishDisplayState(state) {
+  if (window.parent === window) return;
+  const params = new URLSearchParams(window.location.search);
+  window.parent.postMessage({
+    type: 'huellitas-display-state', room: activeRoom, view: params.get('view'), state,
+  }, window.location.origin);
+}
+window.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || document.fullscreenElement || document.querySelector('dialog[open]') || window.parent === window) return;
+  const params = new URLSearchParams(window.location.search);
+  window.parent.postMessage({
+    type: 'huellitas-display-close', room: activeRoom, view: params.get('view'),
+  }, window.location.origin);
+});
+window.addEventListener('pagehide', () => {
+  clearInterval(displayHeartbeat);
+  roaming.destroy();
+  roomSocket?.close();
+  publishDisplayState('disconnected');
 });

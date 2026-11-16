@@ -1,0 +1,79 @@
+/* Only .hlm-pet SVGs are affected. Existing float/arrival animations remain separate. */
+.hlm-pet { display:block; width:100%; height:auto; overflow:visible; }
+.hlm-pet .hlm-tail,.hlm-pet .hlm-chest,.hlm-pet .hlm-head,
+.hlm-pet .hlm-ear-left,.hlm-pet .hlm-ear-right,.hlm-pet .hlm-eye,.hlm-pet .hlm-tag {
+  transform-box:view-box;
+  animation-delay:var(--hlm-phase,0s);
+  animation-timing-function:ease-in-out;
+  animation-iteration-count:infinite;
+}
+.hlm-pet .hlm-chest { transform-origin:160px 315px; animation-name:hlm-breathe; animation-duration:var(--hlm-breath,3.8s); }
+.hlm-pet .hlm-head { transform-origin:160px 217px; animation-name:hlm-dog-head; animation-duration:var(--hlm-head,12s); }
+.hlm-pet .hlm-tail { animation-name:hlm-dog-tail; animation-duration:var(--hlm-tail,4s); }
+.hlm-pet .hlm-eye { animation-name:hlm-blink; animation-duration:var(--hlm-blink,6.4s); }
+.hlm-pet .hlm-ear-left { transform-origin:108px 100px; animation-name:hlm-left-ear; animation-duration:11.7s; }
+.hlm-pet .hlm-ear-right { transform-origin:212px 100px; animation-name:hlm-right-ear; animation-duration:14.3s; }
+.hlm-pet .hlm-tag { transform-origin:160px 234px; animation-name:hlm-tag; animation-duration:var(--hlm-breath,3.8s); }
+.hlm-pet[data-species="cat"] .hlm-tail { animation-name:hlm-cat-tail; }
+.hlm-pet[data-species="cat"] .hlm-head { animation-name:hlm-cat-head; }
+.hlm-pet[data-species="cat"] .hlm-eye { animation-name:hlm-cat-blink; }
+@keyframes hlm-breathe {
+  0%,100% { transform:scale(1,1); }
+  44% { transform:scale(1.012,1.021); }
+}
+@keyframes hlm-dog-head {
+  0%,18%,48%,100% { transform:translateY(0) rotate(0); }
+  27%,34% { transform:translateY(-1px) rotate(-3deg); }
+  40% { transform:translateY(-.3px) rotate(.6deg); }
+  70% { transform:translateY(-1.1px) rotate(1.8deg); }
+  82% { transform:translateY(.3px) rotate(0); }
+}
+@keyframes hlm-cat-head {
+  0%,22%,65%,100% { transform:rotate(0) translateY(0); }
+  35%,43% { transform:rotate(2deg) translateY(-1px); }
+  78%,84% { transform:rotate(-1.2deg) translateY(.5px); }
+}
+/* Wag in short bursts with a quiet interval, rather than a constant metronome. */
+@keyframes hlm-dog-tail {
+  0%,8%,72%,100% { transform:rotate(0); }
+  18%,38%,58% { transform:rotate(-13deg); }
+  28%,48% { transform:rotate(10deg); }
+  66% { transform:rotate(3deg); }
+}
+@keyframes hlm-cat-tail {
+  0%,100% { transform:rotate(-4deg); }
+  36% { transform:rotate(8deg); }
+  65% { transform:rotate(3deg); }
+  82% { transform:rotate(5deg); }
+}
+@keyframes hlm-blink {
+  0%,41%,46%,100% { transform:scaleY(1); }
+  43% { transform:scaleY(.07); }
+  44% { transform:scaleY(.07); }
+}
+/* A longer, relaxed close; paired blink happens only occasionally in the cycle. */
+@keyframes hlm-cat-blink {
+  0%,34%,43%,76%,84%,100% { transform:scaleY(1); }
+  38%,39% { transform:scaleY(.06); }
+  79%,80% { transform:scaleY(.08); }
+}
+@keyframes hlm-left-ear {
+  0%,61%,72%,100% { transform:rotate(0); }
+  64% { transform:rotate(-4deg); }
+  67% { transform:rotate(1.2deg); }
+}
+@keyframes hlm-right-ear {
+  0%,30%,41%,100% { transform:rotate(0); }
+  33% { transform:rotate(4deg); }
+  36% { transform:rotate(-1deg); }
+}
+@keyframes hlm-tag {
+  0%,100% { transform:rotate(-1.2deg); }
+  48% { transform:rotate(1.2deg); }
+}
+/* Works with the existing display pause class, or with an explicit local flag. */
+.is-paused .hlm-pet *, [data-motion-paused="true"] .hlm-pet *,
+.hlm-pet[data-motion-paused="true"] * { animation-play-state:paused!important; }
+@media (prefers-reduced-motion:reduce) {
+  .hlm-pet * { animation:none!important; }
+}

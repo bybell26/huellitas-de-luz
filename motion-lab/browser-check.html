@@ -1,0 +1,55 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="motion.css">
+<div id="gallery"></div><button id="pause" aria-pressed="false"></button>
+<button data-filter="all"></button><button data-filter="dog"></button><button data-filter="cat"></button>
+<p id="motion-note"></p><pre id="result">PENDING</pre>
+<script src="pets-motion.js"></script><script src="preview.js"></script><script>
+try {
+  const assert = (ok, message) => { if (!ok) throw Error(message); };
+  const pets = [...document.querySelectorAll('.hlm-pet')];
+  assert(pets.length === 12, 'All 12 breeds rendered');
+  const ids = [...document.querySelectorAll('[id]')].map(el => el.id);
+  assert(new Set(ids).size === ids.length, 'Unique SVG IDs');
+  for (const svg of pets) {
+    for (const selector of ['.hlm-tail','.hlm-chest','.hlm-head','.hlm-tag','.hlm-ear-left','.hlm-ear-right']) {
+      assert(svg.querySelector(selector), 'Missing ' + selector);
+    }
+    assert(svg.querySelectorAll('.hlm-eye').length === 2, 'Two eyes per pet');
+    assert(!svg.outerHTML.includes('undefined'), 'Valid SVG values');
+    for (const el of svg.querySelectorAll('[fill]')) {
+      const match = el.getAttribute('fill').match(/^url\(#(.*)\)$/);
+      if (match) assert(document.getElementById(match[1]), 'Resolved gradient');
+    }
+  }
+  assert(new Set(pets.map(p => p.style.getPropertyValue('--hlm-phase'))).size > 6, 'Individual timing');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const animations = gallery.getAnimations({subtree:true});
+  if (reduced) {
+    assert(animations.length === 0, 'Reduced motion disables animations');
+  } else {
+    assert(animations.length === 96, '8 animations per pet; found ' + animations.length);
+    const chest = pets[0].querySelector('.hlm-chest');
+    const breath = chest.getAnimations()[0];
+    const delay = Number(breath.effect.getTiming().delay);
+
+    breath.currentTime = delay + 1;
+    const before = getComputedStyle(chest).transform;
+    breath.currentTime = delay + Number(breath.effect.getTiming().duration) * .44;
+    assert(getComputedStyle(chest).transform !== before, 'Breathing changes transform');
+
+    document.getElementById('pause').click();
+    assert(gallery.getAnimations({subtree:true}).every(a => a.playState === 'paused'), 'Pause stops every part');
+    document.getElementById('pause').click();
+    assert(gallery.getAnimations({subtree:true}).every(a => a.playState === 'running'), 'Resume restarts every part');
+  }
+  document.querySelector('[data-filter=cat]').click();
+  assert([...gallery.children].filter(c => !c.hidden).length === 6, 'Cat filter');
+  document.querySelector('[data-filter=dog]').click();
+  assert([...gallery.children].filter(c => !c.hidden).every(c => c.dataset.species === 'dog'), 'Dog filter');
+  document.querySelector('[data-filter=all]').click();
+  assert([...gallery.children].every(c => !c.hidden), 'Restore all');
+  const hostile = HuellitasMotion.render('gato', 'siames', '#a77fff', '<img onerror=bad>');
+  assert(!hostile.includes('<img'), 'Pet names escaped');
+  document.getElementById('result').textContent = 'PASS: 12 breeds, SVG groups, gradients, individual timing, ' +
+    (reduced ? 'reduced motion' : '96 animations, breathing, pause/resume') + ', filters, escaped names.';
+} catch (error) { document.getElementById('result').textContent = 'FAIL: ' + error.message; }
+</script>

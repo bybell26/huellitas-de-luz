@@ -1,6 +1,6 @@
 import { getToken } from './api';
 
-const WS_BASE = 'ws://localhost:4000';
+import { getApiBase } from './config';
 const RECONNECT_BASE_MS = 3000;
 const MAX_RECONNECTS    = 10;
 
@@ -33,11 +33,20 @@ export function createRoomSocket(
 
   async function connect() {
     if (disposed) return;
-    const token  = await getToken();
+    let token: string | null;
+    let base: string;
+    try {
+      token = await getToken();
+      base = getApiBase().replace(/^http/, 'ws');
+    } catch (err) {
+      if (!disposed) onMessage({ type: '_failed', message: err instanceof Error ? err.message : 'No se pudo conectar.' });
+      return;
+    }
+    if (disposed) return;
     const params = new URLSearchParams({ room: roomCode });
     if (token) params.set('token', token);
 
-    ws = new WebSocket(`${WS_BASE}/ws?${params}`);
+    ws = new WebSocket(`${base}/ws?${params}`);
 
     ws.onopen = () => {
       reconnects = 0;

@@ -1,88 +1,73 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  apiAddPetToRoom,
-  apiClearRoom,
-  apiDeletePet,
-  apiGetRoom,
-  apiRemovePetFromRoom,
-  apiSavePet,
-  type Pet,
-} from '../lib/api';
-import { createRoomSocket, type RoomSocket, type WsMessage } from '../lib/ws';
+import { apiAddPetToRoom, apiClearRoom, apiGetRoom, apiRemovePetFromRoom, apiSavePet, type Pet } from '../lib/api';
+import { createRoomSocket } from '../lib/ws';
 
-interface RoomState {
-  pets: Pet[];
-  isLoading: boolean;
-  error: string | null;
-  addPet: (pet: Omit<Pet, 'slot'>) => Promise<void>;
-  removePet: (id: string) => Promise<void>;
-  clearAll: () => Promise<void>;
-}
-
-export function useRoom(roomCode: string | null): RoomState {
+export function useRoom(roomCode: string | null) {
   const [pets, setPets] = useState<Pet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const socketRef = useRef<RoomSocket | null>(null);
+  const refreshRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
+    let disposed = false;
+    let revision = 0;
+    let running: Promise<void> | null = null;
+    setPets([]);
+    setError(null);
     if (!roomCode) {
-      setPets([]);
-      setError(null);
+      setIsLoading(false);
+      refreshRef.current = async () => {};
       return;
     }
-
+    const code = roomCode;
     setIsLoading(true);
-    setError(null);
-
-    apiGetRoom(roomCode)
-      .then(({ pets: loadedPets }) => setPets(loadedPets))
-      .catch(err => setError(err?.message ?? 'Error al cargar la sala'))
-      .finally(() => setIsLoading(false));
-
-    const socket = createRoomSocket(roomCode, (msg: WsMessage) => {
-      switch (msg.type) {
-        case 'pet_added':
-          setPets(prev => {
-            const exists = prev.some(p => p.id === msg.pet.id);
-            return exists ? prev : [...prev, msg.pet as Pet];
-          });
-          break;
-        case 'pet_removed':
-          setPets(prev => prev.filter(p => p.id !== msg.petId));
-          break;
-        case 'room_cleared':
-          setPets([]);
-          break;
-        default:
-          break;
-      }
+    function refresh(): Promise<void> {
+      revision++;
+      if (running) return running;
+      running = (async () => {
+        let observed;
+        do {
+          observed = revision;
+          const data = await apiGetRoom(code);
+          if (!disposed && observed === revision) {
+            setPets(data.pets);
+            setError(null);
+          }
+        } while (!disposed && observed !== revision);
+      })().catch(err => {
+        if (!disposed) setError(err?.message ?? 'Error al cargar la sala');
+      }).finally(() => {
+        running = null;
+        if (!disposed) setIsLoading(false);
+      });
+      return running;
+    }
+    refreshRef.current = refresh;
+    const socket = createRoomSocket(code, msg => {
+      if (['_connected', 'pet_added', 'pet_removed', 'room_cleared'].includes(msg.type)) void refresh();
     });
-
-    socketRef.current = socket;
-
-    return () => {
-      socket.close();
-      socketRef.current = null;
-    };
+    void refresh();
+    return () => { disposed = true; socket.close(); };
   }, [roomCode]);
 
+  function requireRoom(): string {
+    if (!roomCode) throw new Error('La sala todavía no está lista. Reintenta antes de continuar.');
+    return roomCode;
+  }
   async function addPet(pet: Omit<Pet, 'slot'>): Promise<void> {
-    if (!roomCode) return;
+    const code = requireRoom();
     const saved = await apiSavePet(pet);
-    await apiAddPetToRoom(roomCode, saved.id);
+    await apiAddPetToRoom(code, saved.id);
+    await refreshRef.current();
   }
-
   async function removePet(id: string): Promise<void> {
-    if (!roomCode) return;
-    await apiRemovePetFromRoom(roomCode, id);
-    await apiDeletePet(id);
+    await apiRemovePetFromRoom(requireRoom(), id);
+    // Retirar de una sala no debe borrar la mascota de la cuenta ni de otras salas.
+    await refreshRef.current();
   }
-
   async function clearAll(): Promise<void> {
-    if (!roomCode) return;
-    await apiClearRoom(roomCode);
+    await apiClearRoom(requireRoom());
+    await refreshRef.current();
   }
-
   return { pets, isLoading, error, addPet, removePet, clearAll };
 }

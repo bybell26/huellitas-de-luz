@@ -14,13 +14,15 @@ const notification  = document.getElementById('notification');
 const user          = getUser();
 
 const state = {
-  species: null, breed: null, collar: COLORS[0].value,
+  species: null, breed: null, collar: COLORS[0].value, appearance: {},
   name: '', step: 'create', busy: false,
   lastSentId: null, lastReceivedId: null,
 };
 
+const syncRoster = createRosterSync(() => activeRoom, refreshRoster);
 let toastTimer  = null;
 let activeRoom  = null;  // código de sala activa
+let displayState = 'closed';
 let roomSocket  = null;  // cliente WebSocket
 
 // ─── Inicialización ───────────────────────────────────────────────────────────
@@ -29,37 +31,26 @@ async function init() {
   const userEl = document.getElementById('user-name');
   if (userEl) userEl.textContent = user?.name || user?.email || '';
 
-  // Cargar o crear sala activa
+  // Cargar o crear una sala propia antes de permitir pagos.
   await ensureRoom();
+  const codeEl = document.getElementById('room-code');
+  if (codeEl) codeEl.textContent = activeRoom;
 
   // Conectar WebSocket a la sala
   connectRoomSocket();
 
   // Cargar mascotas y renderizar
-  await loadRoster(activeRoom);
+  await syncRoster();
   render();
 }
 
 async function ensureRoom() {
+  const rooms = await apiGetRooms();
   const stored = getActiveRoom();
-  if (stored) {
-    try {
-      const data = await apiGetRoom(stored);
-      activeRoom = data.room.code;
-      setActiveRoom(activeRoom);
-      return;
-    } catch {
-      // Sala no encontrada — crear una nueva
-    }
-  }
-  try {
-    const room = await apiCreateRoom('Mi constelación');
-    activeRoom = room.code;
-    setActiveRoom(activeRoom);
-  } catch (err) {
-    notify('No se pudo crear la sala. Revisa la conexión.');
-    console.error('[app] ensureRoom:', err.message);
-  }
+  const owned = rooms.find(room => room.code === stored) || rooms[0];
+  const room = owned || await apiCreateRoom('Mi constelación');
+  activeRoom = room.code;
+  setActiveRoom(activeRoom);
 }
 
 function connectRoomSocket() {
@@ -70,13 +61,15 @@ function connectRoomSocket() {
 
 function handleWsMessage(msg) {
   if (!msg?.type) return;
+  if (['pet_added', 'pet_removed', 'room_cleared', 'donation_added'].includes(msg.type)) syncRoster();
   switch (msg.type) {
     case '_connected':
-      updateStatus(true);
+      syncRoster();
+      updateStatus();
       break;
     case '_disconnected':
     case '_failed':
-      updateStatus(false);
+      updateStatus();
       break;
     case 'pet_added':
       if (msg.pet && !readRoster().some(p => p.id === msg.pet.id)) {
@@ -100,7 +93,11 @@ function handleWsMessage(msg) {
       refreshRoster();
       break;
     case 'pause':
+      if (typeof msg.paused === 'boolean') setPaused(msg.paused);
+      refreshRoster();
+      break;
     case 'labels':
+      if (typeof msg.visible === 'boolean') setLabelsVisible(msg.visible);
       refreshRoster();
       break;
   }
@@ -115,13 +112,16 @@ function notify(message) {
 }
 
 // ─── Status de pantalla 2 ─────────────────────────────────────────────────────
-function updateStatus(online) {
+function updateStatus() {
   const status = document.getElementById('display-status');
   if (!status) return;
-  const connected = online ?? isDisplayOnline();
-  status.classList.toggle('online', connected);
-  document.getElementById('status-text').textContent =
-    connected ? 'Constelación conectada' : 'Constelación sin abrir';
+  status.classList.toggle('online', displayState === 'connected');
+  document.getElementById('status-text').textContent = ({
+    closed: 'Constelación cerrada',
+    connecting: 'Conectando constelación…',
+    connected: 'Constelación conectada',
+    disconnected: 'Constelación sin conexión',
+  })[displayState];
 }
 
 function updateOperator() {
@@ -139,7 +139,7 @@ function previewMarkup() {
   return `<div class="preview-header"><h3>Así se verá tu mascota</h3><span class="pill">✧ VISTA EN VIVO</span></div>
     <div class="scene"><div class="scene-ring"></div><div class="scene-ring two"></div><i class="scene-spark a"></i><i class="scene-spark b"></i><i class="scene-spark c"></i>
       ${chosen
-        ? `<div class="preview-pet">${petSVG(state.species, state.breed, state.collar, name)}</div>`
+        ? `<div class="preview-pet">${HuellitasMotion.render(state.species, state.breed, state.collar, name, state.appearance)}</div>`
         : '<div class="empty-preview"><span>🐾</span>Selecciona perro o gato y elige una raza para conocer a tu mascota.</div>'}
       <div class="preview-shadow"></div>
     </div>
@@ -190,6 +190,7 @@ function renderCreate() {
         <div><label for="pet-name" class="mini-label">Nombre (opcional)</label><input id="pet-name" class="name-field" maxlength="16" autocomplete="off" placeholder="Ej. Luna" value="${escapeText(state.name)}" /></div>
       </div>
     </div>
+    ${PetAppearance.controls(state.appearance)}
     <button id="continue" class="button button-primary button-wide" type="button" ${complete ? '' : 'disabled'}>${actionContent(full ? 'Constelación completa' : 'Revisar mi mascota', 'arrow', full ? '42 de 42 mascotas' : complete ? 'Tu compañero está listo para el siguiente paso' : 'Elige un animal y una raza para continuar')}</button>
     <p class="field-note">${full ? 'Retira una mascota para crear otra.' : 'Confirma el diseño y paga $0.01 MXN para enviarla a la constelación.'}</p>`;
 
@@ -205,6 +206,7 @@ function renderCreate() {
   formRegion.querySelectorAll('[data-collar]').forEach(btn =>
     btn.addEventListener('click', () => { state.collar = btn.dataset.collar; renderCreate(); renderPreview(); })
   );
+  formRegion.querySelectorAll('[data-appearance]').forEach(input=>input.addEventListener('change',()=>{state.appearance[input.dataset.appearance]=input.value;renderPreview()}));
   document.getElementById('pet-name').addEventListener('input', e => { state.name = e.target.value; renderPreview(); });
   document.getElementById('continue').addEventListener('click', () => {
     if (!complete) return;
@@ -241,6 +243,7 @@ let paymentResult = null;
 
 function beginPayment() {
   if (state.busy) return;
+  if (!activeRoom) { notify('La sala todavía no está lista. Reintenta la conexión antes de pagar.'); return; }
   if (readRoster().length >= MAX_PETS) {
     notify('La constelación está llena. Retira una mascota antes de pagar.');
     return;
@@ -305,6 +308,7 @@ async function startSending(transaction) {
     breed:    state.breed,
     collar:   state.collar,
     name:     state.name.trim(),
+    appearance: PetAppearance.normalize(state.appearance),
     createdAt: Date.now(),
   };
 
@@ -352,11 +356,13 @@ function renderSent() {
     <p class="success-text">Se unió a la constelación compartida. Puedes crear otra mientras todas flotan juntas.</p>
     <div class="saved-pet" id="send-detail">${state.lastReceivedId === state.lastSentId && state.lastSentId ? '✓ Recibida en la constelación' : 'Enviada al servidor ✓'}</div>
     <div class="form-actions"><button type="button" id="new-pet" class="button button-primary button-wide">${actionContent('Crear otra mascota', 'plus', 'Dale un nuevo compañero a tu constelación')}</button></div>
+    <button type="button" id="sent-wallpaper" class="button button-outline button-wide">Crear un fondo con mi mascota</button>
     <p class="field-note">Todas las mascotas siguen flotando, hasta un máximo de 42.</p>`;
 
+  document.getElementById('sent-wallpaper').addEventListener('click',()=>constellationModal.open({wallpaperPetId:state.lastSentId}));
   document.getElementById('new-pet').addEventListener('click', () => {
     state.species = null; state.breed = null; state.collar = COLORS[0].value;
-    state.name = ''; state.step = 'create'; state.lastSentId = null; state.lastReceivedId = null;
+    state.appearance = {}; state.name = ''; state.step = 'create'; state.lastSentId = null; state.lastReceivedId = null;
     render(); scrollTo({ top: 0, behavior: 'smooth' });
   });
 }
@@ -385,7 +391,7 @@ function renderRoster() {
   list.innerHTML = roster.map((pet, i) => {
     const breed = getBreed(pet.species, pet.breed);
     return `<article class="roster-item" data-id="${escapeText(pet.id)}">
-      <span class="roster-avatar">${petSVG(pet.species, pet.breed, pet.collar, pet.name)}</span>
+      <span class="roster-avatar">${HuellitasMotion.render(pet.species, pet.breed, pet.collar, pet.name, pet.appearance)}</span>
       <div class="roster-item-copy"><strong>${escapeText(pet.name || 'Mascota ' + (i + 1))}</strong><small>${labelFor(pet)} · ${escapeText(breed.name)}</small></div>
       <span class="roster-color" style="background:${pet.collar}" title="Collar"></span>
       <button type="button" class="roster-remove" data-remove="${escapeText(pet.id)}" title="Retirar mascota" aria-label="Retirar ${escapeText(pet.name || 'mascota ' + (i + 1))}">✕</button>
@@ -412,13 +418,17 @@ function renderRoster() {
 function refreshRoster() { renderRoster(); updateOperator(); updateStatus(); }
 
 // ─── Controles del operador ───────────────────────────────────────────────────
+const constellationModal = createConstellationModal({
+  dialog: document.getElementById('constellation-modal'),
+  frame: document.getElementById('constellation-frame'),
+  trigger: document.getElementById('open-display'),
+  closeButton: document.getElementById('close-constellation'),
+  getRoom: () => activeRoom,
+  onStateChange: state => { displayState = state; updateStatus(); },
+});
 document.getElementById('open-display').addEventListener('click', () => {
-  if (!activeRoom) { notify('Espera a que se cree la sala.'); return; }
-  const url = new URL('display.html', window.location.href);
-  url.searchParams.set('room', activeRoom);
-  const opened = window.open(url.href, 'huellitas-display', 'width=1280,height=800,resizable=yes');
-  if (!opened) notify('Tu navegador bloqueó la ventana. Abre display.html manualmente.');
-  else { opened.focus(); notify('Mueve la ventana al monitor 2 y activa pantalla completa.'); }
+  if (!activeRoom) { notify('Espera a que se prepare la sala.'); return; }
+  constellationModal.open();
 });
 
 document.getElementById('replay').addEventListener('click', () => {

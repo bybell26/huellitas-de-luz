@@ -39,3 +39,10 @@ test('PENDING o monto distinto no autorizan la mascota', async () => {
   assert.equal(h.updates.some(p => p.status === 'paid'), false);
   h.advance(120000); assert.equal(h.updates.at(-1).status, 'rejected');
 });
+
+test('la creación conserva el motivo del error en lugar de ocultarlo', async () => {
+ const h = harness(async () => { throw Error('Pey indica que CoDi no está habilitado.'); });
+ await h.flow.start();
+ assert.equal(h.updates.at(-1).status, 'error');
+ assert.equal(h.updates.at(-1).message, 'Pey indica que CoDi no está habilitado.');
+});

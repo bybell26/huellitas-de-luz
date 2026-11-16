@@ -2,13 +2,12 @@
  * sw.js — Service Worker para Huellitas de Luz PWA.
  *
  * Estrategia:
- * - Shell estático (HTML, CSS, JS): Cache-first con actualización en background.
+ * - Shell estático (HTML, CSS, JS): Network-first para evitar scripts de pagos antiguos.
  * - API (/api/*): Network-only — nunca cachear datos de autenticación o pago.
  * - Fallback offline: sirve la última versión cacheada del shell.
  */
 
-const CACHE_NAME    = 'huellitas-v1';
-const CACHE_TIMEOUT = 5000; // ms antes de caer al caché en conexión lenta
+const CACHE_NAME    = 'huellitas-v5-qr-network';
 
 const SHELL_URLS = [
   '/index.html',
@@ -17,6 +16,7 @@ const SHELL_URLS = [
   '/css/global.css',
   '/css/creator.css',
   '/css/display.css',
+  '/css/pet-motion.css',
   '/css/login.css',
   '/js/auth.js',
   '/js/api.js',
@@ -25,6 +25,12 @@ const SHELL_URLS = [
   '/js/ws.js',
   '/js/payment-flow.js',
   '/js/animations.js',
+  '/js/pets-motion.js',
+  '/js/pet-appearance.js',
+  '/js/scene-tools.js',
+  '/js/pet-donations.js',
+  '/js/pet-roaming.js',
+  '/js/display-modal.js',
   '/js/app.js',
   '/js/display.js',
   '/manifest.json',
@@ -61,18 +67,20 @@ self.addEventListener('fetch', event => {
   // Solo interceptar GET del mismo origen
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  event.respondWith(
-    caches.match(request).then(cached => {
-      // Revalidar en background (stale-while-revalidate)
-      const networkFetch = fetch(request).then(response => {
-        if (response.ok) {
-          caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
-        }
-        return response;
-      }).catch(() => null);
-
-      // Devolver caché inmediatamente si existe, o esperar red
-      return cached || networkFetch;
-    })
-  );
+  event.respondWith(networkFirst(request));
 });
+
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+  try {
+    // HTML y scripts siempre actuales al tener conexión.
+    const response = await fetch(request, { cache: 'no-store' });
+    if (response.ok) {
+      try { await cache.put(request, response.clone()); } catch { /* La caché nunca debe ocultar una respuesta actual. */ }
+    }
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    return cached || Response.error();
+  }
+}

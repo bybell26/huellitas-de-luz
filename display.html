@@ -9,23 +9,32 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="stylesheet" href="css/global.css" />
   <link rel="stylesheet" href="css/display.css" />
+  <link rel="stylesheet" href="css/pet-motion.css" />
   <!-- Sin requireSession: la pantalla de exhibición es pública (no requiere login) -->
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script src="js/pets.js" defer></script>
+  <script src="js/pet-appearance.js" defer></script>
   <script src="js/storage.js" defer></script>
   <script src="js/ws.js" defer></script>
+  <script src="js/pets-motion.js" defer></script>
   <script src="js/animations.js" defer></script>
+  <script src="js/pet-roaming.js" defer></script>
+  <script src="js/scene-tools.js" defer></script>
+  <script src="js/payment-flow.js" defer></script>
+  <script src="js/pet-donations.js" defer></script>
   <script src="js/display.js" defer></script>
 </head>
 <body class="display-page">
   <header class="display-topbar">
     <div class="brand display-brand">
       <span class="brand-icon">✦</span>
-      <span>huellitas<span class="brand-light">de luz</span><small>CONSTELACIÓN · <span id="display-room-code"></span></small></span>
+      <span>huellitas <span class="brand-light"> de luz</span><small>CONSTELACIÓN · <span id="display-room-code"></span></small></span>
     </div>
     <div class="display-top-actions">
       <span class="display-connected" id="display-connected">○ Conectando…</span>
+<label class="scene-picker">Escenario<select id="scene-select"><option value="constellation">Constelación</option><option value="garden">Jardín</option><option value="park">Parque</option></select></label>
+      <button class="button button-ghost" id="open-wallpaper" type="button">Crear fondo</button>
       <span class="display-counter" id="display-counter">0 mascotas</span>
       <button class="button button-ghost" type="button" id="toggle-names">Ocultar nombres</button>
       <button class="button button-ghost" type="button" id="display-pause">Ⅱ Pausar</button>
@@ -44,6 +53,7 @@
       <p class="waiting-subtitle">Crea tu primera mascota desde la estación para comenzar a llenar el universo.</p>
     </div>
     <div id="constellation" class="constellation" aria-label="Mascotas flotantes"></div>
+    <div id="pet-details" class="pet-details" role="tooltip" hidden><strong data-detail-name></strong><span data-detail-breed></span><span data-detail-donation></span></div>
     <div class="arrival-message" id="arrival-message" aria-live="polite"></div>
   </main>
 
@@ -51,5 +61,24 @@
     <span>✦ Todas las mascotas, un mismo universo</span>
     <span>Esc para salir de pantalla completa</span>
   </div>
+
+  <dialog id="wallpaper-dialog" class="scene-dialog" aria-labelledby="wallpaper-title">
+    <header><h2 id="wallpaper-title">Tu fondo de pantalla</h2><button id="close-wallpaper" class="button button-ghost" type="button">Cerrar</button></header>
+    <form id="wallpaper-form">
+      <label>Título<input name="title" maxlength="60" value="Mis compañeros de luz"></label>
+      <label>Formato<select name="format"><option value="phone">Celular · 1080 × 1920</option><option value="desktop">Computadora · 1920 × 1080</option></select></label>
+      <label class="inline-choice"><input type="checkbox" name="showNames" checked>Incluir nombres</label>
+      <div class="wallpaper-select-actions"><button id="wallpaper-all" type="button">Todas</button><button id="wallpaper-none" type="button">Ninguna</button></div>
+      <fieldset id="wallpaper-pets"><legend>Mascotas</legend></fieldset>
+      <canvas id="wallpaper-preview" aria-label="Vista previa del fondo"></canvas>
+      <p id="wallpaper-status" role="status"></p>
+      <button id="wallpaper-download" class="button button-primary" type="button" disabled>Descargar PNG</button>
+    </form>
+  </dialog>
+  <dialog id="donation-dialog" class="scene-dialog" aria-labelledby="donation-title">
+    <header><h2 id="donation-title">Donar y ver un truco</h2><button id="close-donation" class="button button-ghost" type="button">Cerrar</button></header>
+    <div id="donation-content"></div>
+  </dialog>
+
 </body>
 </html>

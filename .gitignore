@@ -1,0 +1,7 @@
+
+# Configuración privada local: nunca subir claves
+.env
+.env.*
+!.env.example
+*.local.json
+node_modules/

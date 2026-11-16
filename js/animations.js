@@ -1,6 +1,5 @@
 'use strict';
-// 7 columnas x 6 filas; elegimos primero las posiciones más alejadas entre sí.
-// El número de ranura de cada mascota se almacena: al añadir otra, las anteriores NO saltan de sitio.
+// Distribución inicial: después cada mascota recorre la sala sin cambiar su slot guardado.
 function buildSlots(){
   const candidates=[];
   for(let row=0;row<6;row++)for(let col=0;col<7;col++){
@@ -31,8 +30,10 @@ function createPetNode(pet,index){
   const article=document.createElement('article');
   article.className='constellation-pet';
   article.dataset.id=pet.id;
+  article.tabIndex=0;
+  article.setAttribute('role','group');
   const breed=getBreed(pet.species,pet.breed);
-  article.setAttribute('aria-label',`${pet.name||'Mascota '+(index+1)}, ${labelFor(pet)} raza ${breed.name}`);
+  article.setAttribute('aria-label',`${pet.name||'Mascota '+(index+1)}, ${labelFor(pet)} raza ${breed.name}. ${formatPetDonation(pet)}. Ver detalles`);
   const seed=hashId(pet.id);
   const dx=(seed%29)-14,dy=(Math.floor(seed/31)%25)-12;
   article.style.setProperty('--dx',`${dx}px`);
@@ -43,8 +44,22 @@ function createPetNode(pet,index){
   article.style.setProperty('--period',`${4.6+(seed%37)/10}s`);
   article.style.setProperty('--delay',`${-((seed%30)/10)}s`);
   article.innerHTML=`<div class="pet-entry"><div class="pet-floater">
-    <div class="pet-illustration">${petSVG(pet.species,pet.breed,pet.collar,pet.name)}</div>
+    <div class="pet-trick-stage"><div class="pet-illustration">${window.HuellitasMotion ? window.HuellitasMotion.render(pet.species,pet.breed,pet.collar,pet.name,pet.appearance) : petSVG(pet.species,pet.breed,pet.collar,pet.name)}</div>
+    <span class="yarn-ball" aria-hidden="true"></span></div>
     <div class="pet-tag"><strong>${escapeText(pet.name||'Mascota '+(index+1))}</strong><small>${escapeText(breed.name)}</small></div>
+    <div class="pet-actions"><button type="button" data-donate="${escapeText(pet.id)}">♡ Donar</button><button type="button" data-wallpaper="${escapeText(pet.id)}">Crear fondo</button></div>
   </div></div>`;
   return article;
+}
+
+function formatPetDonation(pet) {
+  const amount = pet.donation_amount;
+  const currency = pet.donation_currency;
+  if (amount === null || amount === undefined || amount === '' || !Number.isFinite(Number(amount)) ||
+      Number(amount) < 0 || typeof currency !== 'string' || !/^[A-Z]{3}$/.test(currency)) {
+    return 'Donación sin registro';
+  }
+  try {
+    return 'Donación: ' + new Intl.NumberFormat('es-MX', { style:'currency', currency, currencyDisplay:'code' }).format(Number(amount));
+  } catch { return 'Donación sin registro'; }
 }

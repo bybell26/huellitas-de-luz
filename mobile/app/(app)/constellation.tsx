@@ -2,31 +2,27 @@
  * constellation.tsx — Modal de constelación flotante.
  * Presentado como formSheet desde el creador.
  */
-import { useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Alert, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 
 import FloatingPet from '../../components/FloatingPet';
 import Button      from '../../components/Button';
 import { useRoom } from '../../hooks/useRoom';
-import { useAuth } from '../../hooks/useAuth';
-import { Colors, FontSize, Radius } from '../../constants/theme';
+import { Colors } from '../../constants/theme';
 import { MAX_PETS } from '../../constants/pets';
-import { useEffect, useState } from 'react';
-import { apiGetRoom } from '../../lib/api';
+
 
 const ROOM_KEY = 'huellitas_room_code';
 
 export default function ConstellationScreen() {
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const { pets, removePet, clearAll, isLoading } = useRoom(roomCode);
-  const { user } = useAuth();
 
   useEffect(() => {
     SecureStore.getItemAsync(ROOM_KEY).then(code => {

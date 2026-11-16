@@ -20,6 +20,7 @@ function getUser() {
 }
 
 function saveSession(token, user, persistent = true) {
+  clearSession();
   const store = persistent ? localStorage : sessionStorage;
   store.setItem(TOKEN_KEY, token);
   store.setItem(USER_KEY, JSON.stringify(user));
@@ -29,11 +30,19 @@ function clearSession() {
   [localStorage, sessionStorage].forEach(s => {
     s.removeItem(TOKEN_KEY);
     s.removeItem(USER_KEY);
+    s.removeItem('huellitas_v4_room');
   });
 }
 
 function isLoggedIn() {
-  return !!getToken();
+  const token = getToken();
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (typeof payload.exp === 'number' && payload.exp * 1000 > Date.now()) return true;
+  } catch {}
+  clearSession();
+  return false;
 }
 
 /**
@@ -45,4 +54,14 @@ function requireSession() {
     const redirect = encodeURIComponent(window.location.pathname + window.location.search);
     window.location.href = '/login.html?next=' + redirect;
   }
+}
+
+function safeRedirect(next) {
+  try {
+    const url = new URL(next || '/index.html', window.location.origin);
+    if (url.origin === window.location.origin && url.pathname !== '/login.html') {
+      return url.pathname + url.search + url.hash;
+    }
+  } catch {}
+  return '/index.html';
 }

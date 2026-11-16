@@ -2,9 +2,9 @@
  * payment.ts — Flujo de pago Pey portado de js/payment-flow.js
  * Idéntica lógica: QR → validar → 120 s timeout → PAID o rejected
  */
-import { getToken } from './api';
+import { getToken, handleUnauthorized } from './api';
 
-const API_BASE = 'http://localhost:4000';
+import { getApiBase } from './config';
 
 export type PaymentStatus =
   | { status: 'creating' }
@@ -75,11 +75,12 @@ export function createPaymentFlow(
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${API_BASE}/api/pey`, {
+    const response = await fetch(`${getApiBase()}/api/pey`, {
       method: 'POST', headers,
       body: JSON.stringify(body),
       signal,
     });
+    if (response.status === 401 && token) await handleUnauthorized();
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error('No se pudo consultar Pey.');
     return result.data;
@@ -108,7 +109,7 @@ export function createPaymentFlow(
         if (now() >= deadline) return reject();
 
         const paid = (data.items ?? []).find(
-          (item: any) => item.status === 'PAID' && Number(item.amount) === 0.01,
+          (item: any) => item.status === 'PAID' && Number(item.amount) === 0.01 && (!item.currency || item.currency === 'MXN'),
         );
         if (paid) return finish({ status: 'paid', qr: qr!, transaction: paid });
 

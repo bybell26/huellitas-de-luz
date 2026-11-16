@@ -16,7 +16,7 @@
   <div class="login-wrap">
     <div class="login-brand">
       <span class="brand-icon">✦</span>
-      <span>huellitas<span class="brand-light">de luz</span></span>
+      <span>huellitas <span class="brand-light"> de luz</span></span>
     </div>
 
     <div class="login-card">
@@ -77,7 +77,7 @@
   <script>
     // Si ya hay sesión, redirigir
     if (isLoggedIn()) {
-      const next = new URLSearchParams(window.location.search).get('next') || '/index.html';
+      const next = getRedirect();
       window.location.href = next;
     }
 
@@ -105,7 +105,7 @@
 
     function getRedirect() {
       const next = new URLSearchParams(window.location.search).get('next');
-      return (next && next.startsWith('/')) ? next : '/index.html';
+      return safeRedirect(next);
     }
 
     // ─── Login ────────────────────────────────────────────────────────────────

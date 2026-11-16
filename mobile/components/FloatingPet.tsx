@@ -49,7 +49,7 @@ export default function FloatingPet({ pet, size = 120, isNew = false }: Floating
       scale.value = withSpring(1, { damping: 12, stiffness: 120 });
       opacity.value = withTiming(1, { duration: 800 });
     }
-  }, []);
+  }, [isNew, opacity, scale, translateY]);
 
   const floatStyle = useAnimatedStyle(() => ({
     transform: [

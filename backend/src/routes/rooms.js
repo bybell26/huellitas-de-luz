@@ -53,9 +53,12 @@ router.get('/:code', async (req, res) => {
     if (!room) return res.status(404).json({ error: 'Sala no encontrada.' });
 
     const petsResult = await pool.query(
-      `SELECT p.id, p.species, p.breed, p.collar, p.name, p.created_at, rp.slot
+      `SELECT p.id, p.species, p.breed, p.collar, p.name, p.appearance, p.created_at, rp.slot,
+              (COALESCE(receipt.amount, 0) + COALESCE((SELECT SUM(extra.amount) FROM pet_donations d JOIN payment_receipts extra ON extra.transaction_id = d.transaction_id WHERE d.pet_id = p.id AND extra.redeemed_at IS NOT NULL), 0))::float AS donation_amount, CASE WHEN receipt.amount IS NOT NULL OR EXISTS (SELECT 1 FROM pet_donations d WHERE d.pet_id = p.id) THEN 'MXN' END AS donation_currency
        FROM room_pets rp
        JOIN pets p ON p.id = rp.pet_id
+       LEFT JOIN payment_receipts receipt ON p.id = 'pey-' || receipt.transaction_id
+         AND receipt.user_id = p.user_id AND receipt.redeemed_at IS NOT NULL
        WHERE rp.room_id = $1
        ORDER BY rp.slot ASC`,
       [room.id]
@@ -96,56 +99,48 @@ router.post('/:code/pets', requireAuth, async (req, res) => {
   if (!/^[a-z]+-\d{4}$/.test(code))                    return res.status(400).json({ error: 'Código de sala inválido.' });
   if (typeof petId !== 'string' || !petId)              return res.status(400).json({ error: 'petId requerido.' });
 
+  const client = await pool.connect().catch(() => null);
+  if (!client) return res.status(503).json({ error: 'Base de datos no disponible.' });
   try {
-    // Verificar que la sala existe y la mascota pertenece al usuario
-    const [roomResult, petResult] = await Promise.all([
-      pool.query('SELECT id, max_pets FROM rooms WHERE code = $1', [code]),
-      pool.query('SELECT id FROM pets WHERE id = $1 AND user_id = $2', [petId, req.user.id]),
-    ]);
-
+    await client.query('BEGIN');
+    // Serializar altas por sala para que nadie elija el mismo lugar.
+    const roomResult = await client.query('SELECT id, max_pets FROM rooms WHERE code = $1 FOR UPDATE', [code]);
     const room = roomResult.rows[0];
-    if (!room) return res.status(404).json({ error: 'Sala no encontrada.' });
-
-    const pet = petResult.rows[0];
-    if (!pet) return res.status(404).json({ error: 'Mascota no encontrada o no te pertenece.' });
-
-    // Verificar límite y calcular slot libre
-    const countResult = await pool.query(
-      'SELECT COUNT(*)::int AS total, ARRAY_AGG(slot) AS slots FROM room_pets WHERE room_id = $1',
-      [room.id]
-    );
-    const { total, slots } = countResult.rows[0];
-    if (total >= room.max_pets) {
-      return res.status(409).json({ error: `La sala está llena (máx. ${room.max_pets} mascotas).` });
+    if (!room) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Sala no encontrada.' });
     }
-
-    const usedSlots = new Set((slots ?? []).filter(s => s !== null));
+    const petResult = await client.query(
+      `SELECT p.id, p.species, p.breed, p.collar, p.name, p.appearance, p.created_at, (COALESCE(receipt.amount, 0) + COALESCE((SELECT SUM(extra.amount) FROM pet_donations d JOIN payment_receipts extra ON extra.transaction_id = d.transaction_id WHERE d.pet_id = p.id AND extra.redeemed_at IS NOT NULL), 0))::float AS donation_amount, CASE WHEN receipt.amount IS NOT NULL OR EXISTS (SELECT 1 FROM pet_donations d WHERE d.pet_id = p.id) THEN 'MXN' END AS donation_currency FROM pets p LEFT JOIN payment_receipts receipt ON p.id = 'pey-' || receipt.transaction_id AND receipt.user_id = p.user_id AND receipt.redeemed_at IS NOT NULL WHERE p.id = $1 AND p.user_id = $2 FOR KEY SHARE OF p`, [petId, req.user.id]
+    );
+    if (!petResult.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Mascota no encontrada o no te pertenece.' });
+    }
+    const existing = await client.query('SELECT slot FROM room_pets WHERE room_id = $1 AND pet_id = $2', [room.id, petId]);
+    if (existing.rows.length) {
+      await client.query('COMMIT');
+      return res.json({ pet: { ...petResult.rows[0], slot: existing.rows[0].slot }, duplicate: true });
+    }
+    const occupied = await client.query('SELECT slot FROM room_pets WHERE room_id = $1', [room.id]);
+    const used = new Set(occupied.rows.map(row => row.slot));
     let slot = 0;
-    while (usedSlots.has(slot)) slot++;
-
-    const result = await pool.query(
-      `INSERT INTO room_pets (room_id, pet_id, slot)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (room_id, pet_id) DO NOTHING
-       RETURNING slot`,
-      [room.id, petId, slot]
-    );
-
-    const finalSlot = result.rows[0]?.slot ?? slot;
-
-    // Obtener datos completos de la mascota para el broadcast
-    const fullPet = await pool.query(
-      'SELECT id, species, breed, collar, name, created_at FROM pets WHERE id = $1',
-      [petId]
-    );
-
-    // Notificar a todos los clientes WS de esta sala
-    broadcast(code, { type: 'pet_added', pet: { ...fullPet.rows[0], slot: finalSlot } });
-
-    return res.status(201).json({ pet: { ...fullPet.rows[0], slot: finalSlot } });
+    while (used.has(slot)) slot++;
+    if (occupied.rows.length >= room.max_pets || slot >= room.max_pets) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'La sala está llena.' });
+    }
+    await client.query('INSERT INTO room_pets (room_id, pet_id, slot) VALUES ($1, $2, $3)', [room.id, petId, slot]);
+    await client.query('COMMIT');
+    const pet = { ...petResult.rows[0], slot };
+    broadcast(code, { type: 'pet_added', pet });
+    return res.status(201).json({ pet });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('[rooms/addPet]', err.message);
     return res.status(500).json({ error: 'No se pudo agregar la mascota a la sala.' });
+  } finally {
+    client.release();
   }
 });
 
@@ -190,16 +185,11 @@ router.delete('/:code', requireAuth, async (req, res) => {
   const { code } = req.params;
 
   try {
-    const result = await pool.query(
-      'DELETE FROM room_pets rp USING rooms r WHERE r.id = rp.room_id AND r.code = $1 AND r.owner_id = $2 RETURNING rp.pet_id',
-      [code, req.user.id]
-    );
-    if (result.rows.length === 0) {
-      // Verificar si la sala existe o si no es el dueño
-      const roomCheck = await pool.query('SELECT owner_id FROM rooms WHERE code = $1', [code]);
-      if (!roomCheck.rows[0]) return res.status(404).json({ error: 'Sala no encontrada.' });
-      return res.status(403).json({ error: 'Solo el dueño puede vaciar la sala.' });
-    }
+    const roomResult = await pool.query('SELECT id, owner_id FROM rooms WHERE code = $1', [code]);
+    const room = roomResult.rows[0];
+    if (!room) return res.status(404).json({ error: 'Sala no encontrada.' });
+    if (room.owner_id !== req.user.id) return res.status(403).json({ error: 'Solo el dueño puede vaciar la sala.' });
+    await pool.query('DELETE FROM room_pets WHERE room_id = $1', [room.id]);
 
     broadcast(code, { type: 'room_cleared' });
     return res.json({ cleared: true });
