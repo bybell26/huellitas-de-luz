@@ -114,7 +114,20 @@ se admite el archivo privado `pruebas-pey/config.local.json`; un valor de ejempl
 en `.env` ya no bloquea ese fallback. Reinicia el backend después de cambiar
 `.env`. Ambos archivos privados están excluidos de Git.
 
-## Donaciones adicionales
+## Actividades del hogar
+
+`GET /api/pets/:id/activities` devuelve los usos gratuitos restantes de la
+mascota propia. `POST` en esa ruta recibe `action` (`feed`, `play`, `bath` o
+`style`) y un `requestId` UUID único. Cada mascota tiene cinco usos gratuitos
+por actividad, sin reinicio diario. El servidor conserva el saldo, comprueba
+la propiedad y serializa solicitudes simultáneas; reintentar el mismo UUID no
+consume otro uso. Al agotarse responde 409: todavía no hay precio ni cobro.
+
+`style` requiere `appearance` y `collar` válidos. Solo guardar un cambio real
+consume un uso; previsualizar o cancelar no lo consume. Ejecuta `npm run migrate`
+para agregar `pet_activities` y reinicia el backend después de actualizar.
+
+## Donaciones adicionales (API)
 
 `POST /api/pey` con `action: create`, `purpose: extra`, `petId`, `amount` y
 `trick` crea un cobro específico. Se admiten `paw`/`spin` para perro y

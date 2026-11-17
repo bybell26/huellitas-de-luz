@@ -12,6 +12,65 @@ const VALID_BREEDS = {
   gato:  ['siames', 'persa', 'bengali', 'britanico', 'maine', 'sphynx'],
 };
 const VALID_COLLARS = ['#a77fff', '#6fe1cf', '#ff8b88', '#73a7fc', '#ffc96d', '#33435c'];
+const ACTIVITIES = ['feed', 'play', 'bath', 'style'];
+async function activityBalance(db, petId) {
+  const result = await db.query('SELECT action, count(*)::int AS used FROM pet_activities WHERE pet_id = $1 GROUP BY action', [petId]);
+  return Object.fromEntries(ACTIVITIES.map(action => [action, Math.max(0, 5 - (result.rows.find(row => row.action === action)?.used || 0))]));
+}
+
+router.get('/:id/activities', requireAuth, async (req, res) => {
+  try {
+    const pet = await pool.query('SELECT id FROM pets WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    if (!pet.rowCount) return res.status(404).json({ error: 'Mascota no encontrada.' });
+    return res.json({ remaining: await activityBalance(pool, req.params.id) });
+  } catch (err) {
+    console.error('[pets/activities]', err.message);
+    return res.status(500).json({ error: 'No se pudieron cargar las actividades.' });
+  }
+});
+
+router.post('/:id/activities', requireAuth, async (req, res) => {
+  const { action, requestId, appearance, collar } = req.body ?? {};
+  if (!ACTIVITIES.includes(action) || typeof requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+    return res.status(400).json({ error: 'Actividad o identificador inválido.' });
+  }
+  if (action === 'style' && (!appearance || !validateAppearance(appearance) || !VALID_COLLARS.includes(collar))) {
+    return res.status(400).json({ error: 'Estilo inválido.' });
+  }
+  let client;
+  try {
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const found = await client.query('SELECT id, species, breed, collar, name, appearance FROM pets WHERE id = $1 AND user_id = $2 FOR UPDATE', [req.params.id, req.user.id]);
+    if (!found.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Mascota no encontrada.' }); }
+    let pet = found.rows[0];
+    const previous = await client.query('SELECT action FROM pet_activities WHERE pet_id = $1 AND request_id = $2', [pet.id, requestId]);
+    if (previous.rowCount && previous.rows[0].action !== action) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'El identificador ya corresponde a otra actividad.' });
+    }
+    if (!previous.rowCount) {
+      const remaining = await activityBalance(client, pet.id);
+      if (!remaining[action]) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Agotaste los 5 usos gratuitos. El precio aún está por definir.', remaining });
+      }
+      if (action === 'style') {
+        const same = collar === pet.collar && Object.keys({ ...pet.appearance, ...appearance }).every(key => (pet.appearance[key] || 'breed') === (appearance[key] || 'breed'));
+        if (same) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Elige un estilo diferente antes de guardar.' }); }
+        pet = (await client.query('UPDATE pets SET appearance = $2::jsonb, collar = $3 WHERE id = $1 RETURNING id, species, breed, collar, name, appearance', [pet.id, JSON.stringify(appearance), collar])).rows[0];
+      }
+      await client.query('INSERT INTO pet_activities (pet_id, request_id, action) VALUES ($1, $2, $3)', [pet.id, requestId, action]);
+    }
+    const remaining = await activityBalance(client, pet.id);
+    await client.query('COMMIT');
+    return res.json({ pet, remaining, action, duplicate: !!previous.rowCount });
+  } catch (err) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
+    console.error('[pets/activity]', err.message);
+    return res.status(500).json({ error: 'No se pudo completar la actividad. Puedes reintentar.' });
+  } finally { client?.release(); }
+});
 
 function validatePet({ id, species, breed, collar, name }) {
   if (typeof id !== 'string' || !/^pey-[A-Za-z0-9_-]+$/.test(id)) return 'ID de mascota inválido.';

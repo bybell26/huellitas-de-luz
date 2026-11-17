@@ -24,14 +24,14 @@
   ],
   "screenshots": [
     {
-      "src": "assets/screenshots/screenshot-creator.png",
-      "sizes": "1280x800",
+      "src": "assets/screenshots/01_Creador.png",
+      "sizes": "1536x1386",
       "type": "image/png",
       "label": "Estación de creación"
     },
     {
-      "src": "assets/screenshots/screenshot-display.png",
-      "sizes": "1280x800",
+      "src": "assets/screenshots/02_Constelacion_Cuatro.png",
+      "sizes": "1536x864",
       "type": "image/png",
       "label": "Constelación"
     }

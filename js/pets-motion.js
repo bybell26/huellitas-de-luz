@@ -80,7 +80,8 @@ function naturalPetSVG(s,id,color=COLORS[0].value,name='',appearance={}){
   const initials=escapeText(Array.from(String(name||'').trim()).slice(0,2).join('').toUpperCase());
   const iris=b.kind==='pointy'?'#74cdeb':cat?(b.kind==='siames'?'#68cfe8':b.kind==='britanico'?'#e8ad51':'#aad078'):'#a47953';
   const eyes=[129,191].map((x,i)=>`<g class="hlm-eye" style="transform-origin:${x}px 141px"><ellipse cx="${x}" cy="141" rx="${cat?10:8}" ry="11" fill="${b.kind==='pointy'&&i===1?'#d4a269':iris}"/><ellipse cx="${x}" cy="141" rx="${cat?3.5:6}" ry="9" fill="#25283c"/><circle cx="${x-2}" cy="138" r="1.8" fill="#fff" opacity=".7"/></g>`).join('');
-  const earBreed={...b,kind:appearance.ears==='pointed'?(cat?'maine':'pointy'):'floppy'};
+  // La opción puntiaguda usa orejas de gato compactas, sin los penachos del Maine Coon.
+  const earBreed={...b,kind:appearance.ears==='pointed'?(cat?'pointed':'pointy'):'floppy'};
   const softCat='<path d="M90 110Q65 45 110 60L138 85Z" fill="'+b.ear+'"/><path d="M230 110Q255 45 210 60L182 85Z" fill="'+b.ear+'"/>';
   const ears=appearance.ears&&appearance.ears!=='breed'?(cat?(appearance.ears==='soft'?softCat:catEars(earBreed)):dogEars(earBreed)):hairless?`<path d="M94 124Q60 80 65 18Q114 24 141 90M226 124Q260 80 255 18Q206 24 179 90" fill="${b.coat}" stroke="${b.ear}" stroke-width="3" stroke-linejoin="round"/><path d="M99 101Q78 65 80 37Q111 48 126 91M221 101Q242 65 240 37Q209 48 194 91" fill="#ba7b91"/><path d="M90 52L102 86M230 52L218 86" stroke="#f7c5c4" stroke-width="4" stroke-linecap="round"/>`:cat?catEars(b):dogEars(b);
   const tail=appearance.tail==='short'?'M216 263Q239 254 235 242':appearance.tail==='curled'?'M216 263Q285 266 264 227Q245 207 244 233':appearance.tail==='long'?'M211 271Q287 305 287 228Q287 203 273 197':cat?'M211 271Q280 302 279 241Q279 219 265 223':'M216 263Q272 243 255 201';

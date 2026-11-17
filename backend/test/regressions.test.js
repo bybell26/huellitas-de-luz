@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { before, after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
@@ -31,7 +31,7 @@ before(async () => {
   ({ signToken } = await import('../src/middleware/auth.js'));
   const app = express();
   app.use(express.json());
-  for (const [route, file] of [['pets','pets'],['rooms','rooms'],['pey','pey']]) {
+  for (const [route, file] of [['auth','auth'],['pets','pets'],['rooms','rooms'],['pey','pey']]) {
     app.use('/api/' + route, (await import('../src/routes/' + file + '.js')).default);
   }
   server = createServer(app);
@@ -79,6 +79,87 @@ async function pay(user, tx, amount = 0.01, currency = 'MXN') {
   assert.equal(result.status,200);
   return qr;
 }
+
+test('registro, login y mascota pagada se sincronizan entre dos clientes', async () => {
+  const account = { email: 'integration@test.example', password: 'Integration-123!', name: 'Integración' };
+  const registered = await send('POST', '/api/auth/register', null, account);
+  assert.equal(registered.status, 201);
+  assert.ok(registered.body.token);
+  assert.equal(registered.body.user.password, undefined);
+  const loggedIn = await send('POST', '/api/auth/login', null, account);
+  assert.equal(loggedIn.status, 200);
+  assert.equal(loggedIn.body.user.id, registered.body.user.id);
+  assert.equal((await send('POST', '/api/auth/login', null, { ...account, password: 'incorrect-password' })).status, 401);
+  const profile = await originalFetch(base + '/api/auth/me', { headers: { Authorization: 'Bearer ' + loggedIn.body.token } });
+  assert.equal(profile.status, 200);
+  assert.equal((await profile.json()).user.id, registered.body.user.id);
+  const user = loggedIn.body.user;
+  const room = (await send('POST', '/api/rooms', user, { name: 'Integración' })).body.room;
+  const clients = [];
+  for (let i = 0; i < 2; i++) {
+    const socket = new WebSocket(base.replace('http:', 'ws:') + '/ws?room=' + room.code + '&token=' + loggedIn.body.token);
+    sockets.add(socket);
+    await once(socket, 'open');
+    clients.push(socket);
+  }
+  const received = clients.map(socket => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { socket.off('message', handler); reject(Error('No llegó pet_added')); }, 2000);
+    function handler(raw) {
+      const event = JSON.parse(raw);
+      if (event.type === 'pet_added') { clearTimeout(timer); socket.off('message', handler); resolve(event.pet); }
+    }
+    socket.on('message', handler);
+  }));
+  await pay(user, 'INTEGRATION');
+  const saved = await send('POST', '/api/pets', user, pet('INTEGRATION'));
+  assert.equal(saved.status, 201);
+  const added = await send('POST', '/api/rooms/' + room.code + '/pets', user, { petId: pet('INTEGRATION').id });
+  assert.equal(added.status, 201);
+  for (const synced of await Promise.all(received)) assert.equal(synced.id, pet('INTEGRATION').id);
+  const roster = await send('GET', '/api/rooms/' + room.code, user);
+  assert.equal(roster.body.pets[0].id, pet('INTEGRATION').id);
+  clients.forEach(socket => socket.close());
+});
+
+test('actividades: cinco usos por mascota, propiedad, concurrencia y estilo persistente', async () => {
+  const [owner, other] = users;
+  await pay(owner, 'CARE');
+  const id = pet('CARE').id;
+  assert.equal((await send('POST', '/api/pets', owner, pet('CARE'))).status, 201);
+  const route = '/api/pets/' + id + '/activities';
+  assert.equal((await send('GET', route, null)).status, 401);
+  assert.equal((await send('GET', route, other)).status, 404);
+  assert.equal((await send('POST', route, other, { action: 'feed', requestId: randomUUID() })).status, 404);
+  assert.equal((await send('POST', route, owner, { action: 'invalid', requestId: randomUUID() })).status, 400);
+  assert.deepEqual((await send('GET', route, owner)).body.remaining, { feed: 5, play: 5, bath: 5, style: 5 });
+  const request = { action: 'feed', requestId: randomUUID() };
+  const results = await Promise.all(Array.from({ length: 3 }, () => send('POST', route, owner, request)));
+  assert.ok(results.every(result => result.status === 200 && result.body.remaining.feed === 4));
+  assert.equal((await send('POST', route, owner, { ...request, action: 'play' })).status, 409);
+  const simultaneous = await Promise.all(Array.from({ length: 6 }, () => send('POST', route, owner, { action: 'play', requestId: randomUUID() })));
+  assert.equal(simultaneous.filter(result => result.status === 200).length, 5);
+  assert.equal(simultaneous.filter(result => result.status === 409).length, 1);
+  for (let i = 0; i < 5; i++) {
+    assert.equal((await send('POST', route, owner, { action: 'bath', requestId: randomUUID() })).status, 200);
+    assert.equal((await send('POST', route, owner, { action: 'style', requestId: randomUUID(), appearance: { fur: i % 2 ? 'cream' : 'gray' }, collar: '#73a7fc' })).status, 200);
+  }
+  for (const action of ['play', 'bath', 'style']) {
+    const exhausted = await send('POST', route, owner, { action, requestId: randomUUID(), appearance: { fur: 'black' }, collar: '#73a7fc' });
+    assert.equal(exhausted.status, 409);
+    assert.equal(exhausted.body.remaining[action], 0);
+  }
+  const pets = (await send('GET', '/api/pets', owner)).body.pets;
+  assert.deepEqual(pets.find(item => item.id === id).appearance, { fur: 'gray' });
+  assert.equal(pets.find(item => item.id === id).collar, '#73a7fc');
+  assert.deepEqual((await send('GET', route, owner)).body.remaining, { feed: 4, play: 0, bath: 0, style: 0 });
+  // Una mascota nueva tiene su propio saldo y un estilo inválido no consume usos.
+  await pay(owner, 'CARE2');
+  await send('POST', '/api/pets', owner, pet('CARE2'));
+  const second = '/api/pets/' + pet('CARE2').id + '/activities';
+  assert.equal((await send('POST', second, owner, { action: 'style', requestId: randomUUID(), appearance: { fur: 'neon' }, collar: '#73a7fc' })).status, 400);
+  assert.equal((await send('POST', second, owner, { action: 'style', requestId: randomUUID(), appearance: {}, collar: '#a77fff' })).status, 400);
+  assert.deepEqual((await send('GET', second, owner)).body.remaining, { feed: 5, play: 5, bath: 5, style: 5 });
+});
 
 test('pago obligatorio, propiedad del QR, consumo único y reintento de mascota', async () => {
   const [a,b] = users;

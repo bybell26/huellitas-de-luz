@@ -85,3 +85,12 @@ CREATE TABLE IF NOT EXISTS pet_donations (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS pet_donations_pet_idx ON pet_donations(pet_id);
+
+-- Cinco usos gratuitos por actividad y mascota; request_id hace seguros los reintentos.
+CREATE TABLE IF NOT EXISTS pet_activities (
+  pet_id TEXT NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+  request_id UUID NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('feed', 'play', 'bath', 'style')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (pet_id, request_id)
+);

@@ -7,12 +7,15 @@
  * - Fallback offline: sirve la última versión cacheada del shell.
  */
 
-const CACHE_NAME    = 'huellitas-v5-qr-network';
+const CACHE_NAME    = 'huellitas-v8-hogar-actividades';
 
 const SHELL_URLS = [
   '/index.html',
   '/login.html',
   '/display.html',
+  '/hogar.html',
+  '/css/hogar.css',
+  '/js/hogar.js',
   '/css/global.css',
   '/css/creator.css',
   '/css/display.css',
@@ -34,6 +37,8 @@ const SHELL_URLS = [
   '/js/app.js',
   '/js/display.js',
   '/manifest.json',
+  '/assets/icon-192.png',
+  '/assets/icon-512.png',
 ];
 
 // ─── Instalación — pre-cachear el shell ──────────────────────────────────────
