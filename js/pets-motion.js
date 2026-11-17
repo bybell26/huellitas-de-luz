@@ -120,6 +120,7 @@ function naturalPetSVG(s,id,color=COLORS[0].value,name='',appearance={}){
   <ellipse cx="160" cy="176" rx="${cat?38:43}" ry="${cat?25:29}" fill="${b.muzzle}" opacity=".94"/>
   <ellipse cx="108" cy="165" rx="13" ry="7" fill="#f791a6" opacity=".35"/><ellipse cx="212" cy="165" rx="13" ry="7" fill="#f791a6" opacity=".35"/>
   ${eyes}${mouth}</g>
+  <g class="hlm-collar">
   <path d="M111 208Q160 226 209 208L207 230Q160 250 113 230Z" fill="${collar}" stroke="#36344d" stroke-width="2"/>
   <path d="M111 208Q160 226 209 208L207 230Q160 250 113 230Z" fill="url(#gloss-${uid})"/>
   <path d="M118 216Q160 232 202 216" fill="none" stroke="white" stroke-opacity=".55" stroke-width="2" stroke-dasharray="3 5" stroke-linecap="round"/>
@@ -130,7 +131,7 @@ function naturalPetSVG(s,id,color=COLORS[0].value,name='',appearance={}){
   <circle cx="160" cy="249" r="14" fill="none" stroke="#fff0b7" stroke-width="1.5"/>
   <text x="160" y="254" text-anchor="middle" font-family="sans-serif" font-size="${initials?11:16}" font-weight="800" fill="#79502d">${initials||'★'}</text>
   <path d="M147 238L152 235" stroke="#fff9db" stroke-width="3" stroke-linecap="round"/>
-  </g></svg>`;
+  </g></g></svg>`;
 }
 
 function labelFor(pet){return pet.species==='perro'?'Perro':'Gato'}

@@ -10,10 +10,10 @@ El servidor ahora es servidor_local.cjs; servidor_local.py queda como lanzador c
 
 1. Elige mascota, raza, collar y nombre.
 2. Revisa y confirma el diseno.
-3. Se genera un QR real de $0.01 MXN en lugar de la segunda confirmacion.
+3. Elige $50, $100, $150 o $200 MXN, u otra cantidad estrictamente mayor a $200 (hasta dos decimales). El QR se genera por ese monto.
 4. Escanea el QR con tu app bancaria y autoriza el pago.
 5. Pulsa Ya pague, validar cobro. Se muestra la pantalla de carga y comienza un plazo de 120 segundos, consultando cada 2 segundos cuando no hay una consulta en curso.
-6. Solo PAID por $0.01 MXN permite guardar la mascota y enviarla a display.html mediante el bus existente.
+6. Solo PAID por el importe elegido en MXN permite guardar la mascota y enviarla a display.html mediante WebSocket.
 7. Sin confirmacion al vencer el plazo: Cobro rechazado por tiempo agotado. La mascota no se publica y las respuestas tardias se descartan.
 
 El rechazo por tiempo agotado es una decision local: no cancela el QR, no representa un rechazo bancario y no devuelve dinero. Pey exige al menos 360 segundos de vigencia en un QR; se conserva la vigencia de 600 segundos. El plazo local de validacion es independiente.
@@ -46,7 +46,7 @@ configurado. El lanzador web de Windows por sí solo no inicia PostgreSQL ni la 
 de cuentas/salas en el puerto 4000.
 
 Para crear mascotas nuevas, el servidor registra primero el QR a nombre de la
-cuenta y después verifica su pago mediante `/api/pey`. El recibo de $0.01 MXN se
+cuenta y después verifica su pago mediante `/api/pey`. El recibo por el monto elegido se
 consume una sola vez. Los reintentos de la misma mascota conservan su ID y su
 posición. Retirar una mascota de una sala conserva la mascota en la cuenta.
 

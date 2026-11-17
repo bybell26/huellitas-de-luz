@@ -5,114 +5,40 @@
   const message = document.getElementById('home-message');
   const count = document.getElementById('home-count');
   const refresh = document.getElementById('home-refresh');
-  let loading = false;
-  let signature = null;
-  let roster = [];
   const dialog = document.getElementById('pet-care');
   const careStatus = document.getElementById('care-status');
   const careAvatar = document.getElementById('care-avatar');
-  const careEffect = document.getElementById('care-effect');
-  const styleForm = document.getElementById('care-style');
-  const styleFields = document.getElementById('care-style-fields');
-  const collarField = document.getElementById('care-collar');
-  const closeButton = document.getElementById('care-close');
-  let selected = null, balance = null, busy = false, opening = 0, effectTimer;
-  const pending = new Map();
-
-  function renderCare(appearance = selected?.appearance, collar = selected?.collar) {
-    if (selected) careAvatar.innerHTML = HuellitasMotion.render(selected.species, selected.breed, collar, selected.name, appearance);
-  }
-  function updateActivities() {
-    for (const button of dialog.querySelectorAll('[data-care]')) {
-      const left = balance?.[button.dataset.care];
-      button.disabled = busy || left === undefined || left === 0;
-      button.querySelector('small').textContent = left === undefined ? 'No disponible' : left ? `${left} de 5 gratis` : 'Sin usos gratis · precio por definir';
-    }
-    closeButton.disabled = busy;
-    for (const field of styleForm.querySelectorAll('button, select')) field.disabled = busy;
-  }
+  let loading = false, signature = null, roster = [], selected = null, opening = 0;
+  let dailyTimer;
   async function openCare(pet) {
     selected = pet;
-    balance = null;
     const revision = ++opening;
-    clearTimeout(effectTimer);
-    careEffect.textContent = '';
-    careAvatar.removeAttribute('data-activity');
-    styleForm.hidden = true;
     document.getElementById('care-title').textContent = pet.name || 'Tu mascota';
-    careStatus.textContent = 'Cargando tus actividades gratuitas…';
-    renderCare();
-    updateActivities();
-    dialog.showModal();
+    careAvatar.innerHTML = HuellitasMotion.render(pet.species, pet.breed, pet.collar, pet.name, pet.appearance);
+    careStatus.textContent = 'Cargando actividades?';
+    dialog.querySelectorAll('[data-care]').forEach(button => { button.disabled = true; button.querySelector('small').textContent = 'Cargando?'; });
+    if (!dialog.open) dialog.showModal();
     try {
-      const result = await apiFetch(`/api/pets/${encodeURIComponent(pet.id)}/activities`);
+      const { remaining, resetsAt } = await apiFetch('/api/pets/' + encodeURIComponent(pet.id) + '/activities');
       if (revision !== opening || !dialog.open) return;
-      balance = result.remaining;
-      careStatus.textContent = '¿Qué hacemos hoy?';
-    } catch (error) {
-      if (revision === opening && dialog.open) careStatus.textContent = `${error.message} Cierra y vuelve a seleccionar tu mascota para reintentar.`;
-    }
-    if (revision === opening) updateActivities();
-  }
-  function editStyle() {
-    styleFields.innerHTML = PetAppearance.controls(selected.appearance);
-    styleFields.querySelector('details').open = true;
-    collarField.replaceChildren(...COLORS.map(color => {
-      const option = new Option(color.label, color.value);
-      option.selected = color.value === selected.collar;
-      return option;
-    }));
-    styleForm.hidden = false;
-    careStatus.textContent = 'Prueba tu look. Solo guardar un cambio consume un uso gratuito.';
-    styleForm.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }
-  function draftAppearance() {
-    return Object.fromEntries([...styleFields.querySelectorAll('[data-appearance]')].map(field => [field.dataset.appearance, field.value]));
-  }
-  async function doActivity(action, extras = {}) {
-    if (busy || !balance?.[action]) return;
-    busy = true;
-    updateActivities();
-    careStatus.textContent = 'Un momento…';
-    const key = `${selected.id}:${action}`;
-    const payload = JSON.stringify(extras);
-    let request = pending.get(key);
-    if (!request || request.payload !== payload) {
-      request = { payload, body: { action, requestId: crypto.randomUUID(), ...extras } };
-      pending.set(key, request);
-    }
-    try {
-      const result = await apiFetch(`/api/pets/${encodeURIComponent(selected.id)}/activities`, { method: 'POST', body: JSON.stringify(request.body) });
-      pending.delete(key);
-      balance = result.remaining;
-      selected = { ...selected, ...result.pet };
-      roster = roster.map(pet => pet.id === selected.id ? selected : pet);
-      signature = null;
-      renderCare();
-      styleForm.hidden = true;
-      const messages = { feed: '¡Qué rico! Tu mascota disfrutó su comida.', play: '¡A jugar! Un ratito de diversión juntos.', bath: '¡Lista! Tu mascota quedó limpia y reluciente.', style: '¡Nuevo look! El estilo quedó guardado.' };
-      careStatus.textContent = messages[action];
-      careEffect.textContent = { feed: '🍲 💛', play: '🎾 ✨', bath: '🫧 🧼', style: '✨ 💜' }[action];
-      careAvatar.dataset.activity = action;
-      clearTimeout(effectTimer);
-      effectTimer = setTimeout(() => { careEffect.textContent = ''; careAvatar.removeAttribute('data-activity'); }, 3500);
-    } catch (error) {
-      // El mismo identificador permite reintentar sin descontar dos veces.
-      careStatus.textContent = error.message;
-      try { balance = (await apiFetch(`/api/pets/${encodeURIComponent(selected.id)}/activities`)).remaining; } catch {}
-    } finally { busy = false; updateActivities(); }
+      clearTimeout(dailyTimer);
+      const delay = new Date(resetsAt).getTime() - Date.now();
+      if (Number.isFinite(delay)) dailyTimer = setTimeout(() => { if (dialog.open) openCare(pet); }, Math.max(1000, delay + 250));
+      dialog.querySelectorAll('[data-care]').forEach(button => {
+        const left = remaining[button.dataset.care];
+        button.disabled = !left;
+        button.querySelector('small').textContent = left ? left + ' de 3 hoy' : 'Límite de hoy · vuelve mañana';
+      });
+      careStatus.textContent = 'Elige una actividad para ir a su espacio.';
+    } catch (error) { if (revision === opening) careStatus.textContent = error.message + ' Cierra y vuelve a intentar.'; }
   }
   dialog.querySelectorAll('[data-care]').forEach(button => button.addEventListener('click', () => {
-    if (button.dataset.care === 'style') editStyle();
-    else doActivity(button.dataset.care);
+    const params = new URLSearchParams({ pet: selected.id, action: button.dataset.care });
+    window.location.href = 'actividad.html?' + params;
   }));
-  styleForm.addEventListener('change', () => renderCare(draftAppearance(), collarField.value));
-  styleForm.addEventListener('submit', event => { event.preventDefault(); doActivity('style', { appearance: draftAppearance(), collar: collarField.value }); });
-  document.getElementById('care-style-cancel').addEventListener('click', () => { styleForm.hidden = true; renderCare(); careStatus.textContent = '¿Qué hacemos hoy?'; });
-  closeButton.addEventListener('click', () => { if (!busy) dialog.close(); });
-  dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
-  dialog.addEventListener('close', () => { opening++; loadHome(); });
-
+  document.getElementById('care-close').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => { clearTimeout(dailyTimer); opening++; loadHome(); });
+  window.addEventListener('focus', () => { if (dialog.open && selected) openCare(selected); });
   async function loadHome() {
     if (loading || dialog.open || !isLoggedIn()) return;
     loading = true;
@@ -164,6 +90,6 @@
   window.addEventListener('focus', loadHome);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) loadHome(); });
   const timer = setInterval(() => { if (!document.hidden) loadHome(); }, 15000);
-  window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
+  window.addEventListener('pagehide', () => { clearInterval(timer); }, { once: true });
   loadHome();
 })();

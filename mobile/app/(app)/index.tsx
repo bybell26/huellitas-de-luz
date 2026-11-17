@@ -43,6 +43,13 @@ export default function CreatorScreen() {
   const [payStatus,  setPayStatus]  = useState<PaymentStatus | null>(null);
   const [, setLastPetId]  = useState<string | null>(null);
   const [savingPet,  setSavingPet]  = useState(false);
+  const [amountChoice, setAmountChoice] = useState<number | 'custom'>(50);
+  const [customAmount, setCustomAmount] = useState('');
+  const amount = amountChoice === 'custom' ? Number(customAmount.replace(',', '.')) : amountChoice;
+  const amountCents = Math.round(amount * 100);
+  const validAmount = Number.isFinite(amount) && amount > 0 && amount <= 9999999999.99 && Math.abs(amount * 100 - amountCents) < .0001 &&
+    (amountChoice === 'custom' ? amount > 200 : [50, 100, 150, 200].includes(amount));
+  const amountLabel = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`;
 
   // ── Sala ──────────────────────────────────────────────────────────────────
   useFocusEffect(useCallback(() => {
@@ -178,10 +185,25 @@ export default function CreatorScreen() {
             </View>
           ))}
         </Card>
-        <Text style={styles.hint}>El siguiente paso es pagar $0.01 MXN con QR.</Text>
+        <Card style={styles.cardSection}>
+          <Text style={styles.fieldLabel}>Elige tu aportación · MXN</Text>
+          <View style={styles.amountOptions}>
+            {([50, 100, 150, 200, 'custom'] as const).map(value => (
+              <TouchableOpacity key={value} style={[styles.amountOption, amountChoice === value && styles.amountSelected]} accessibilityRole="button" accessibilityState={{ selected: amountChoice === value }} onPress={() => setAmountChoice(value)}>
+                <Text style={styles.reviewValue}>{value === 'custom' ? 'Otra cantidad' : `$${value}`}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {amountChoice === 'custom' && <>
+            <Text style={styles.reviewLabel}>Otra cantidad, mayor a $200 MXN</Text>
+            <TextInput style={styles.nameInput} value={customAmount} onChangeText={setCustomAmount} inputMode="decimal" accessibilityLabel="Otra cantidad en pesos, mayor a 200" placeholder="Ej. 250.00" placeholderTextColor={Colors.muted} />
+            {!validAmount && <Text style={styles.hint}>Ingresa más de $200 MXN, con hasta dos decimales.</Text>}
+          </>}
+        </Card>
+        <Text style={styles.hint}>Paga con QR por el monto elegido.</Text>
         <View style={styles.actionRow}>
           <Button label="Editar" variant="outline" onPress={() => setStep('create')} style={{ flex: 1 }} />
-          <Button label="Pagar $0.01 MXN" onPress={beginPayment} style={{ flex: 1 }} />
+          <Button label={validAmount ? `Pagar ${amountLabel}` : 'Elige un monto válido'} disabled={!validAmount} onPress={beginPayment} style={{ flex: 1 }} />
         </View>
       </ScrollView>
     );
@@ -193,6 +215,7 @@ export default function CreatorScreen() {
   useEffect(() => () => flow?.dispose(), [flow]);
 
   function beginPayment() {
+    if (!validAmount) return;
     if (!roomCode || isLoading || roomError || isFull) {
       Alert.alert('Sala no disponible', 'Espera a que la sala esté lista y tenga espacio antes de pagar.');
       return;
@@ -204,14 +227,14 @@ export default function CreatorScreen() {
         pf.dispose();
         handlePaid(update.transaction);
       }
-    });
+    }, { amount });
     setFlow(pf);
     setStep('payment');
     pf.start();
   }
 
   async function handlePaid(transaction: any) {
-    if (!transaction || transaction.status !== 'PAID' || Number(transaction.amount) !== 0.01) return;
+    if (!transaction || transaction.status !== 'PAID' || Number(transaction.amount) !== amount) return;
     setSavingPet(true);
     const pet: Omit<Pet, 'slot'> = {
       id: `pey-${transaction.id}`,
@@ -246,10 +269,10 @@ export default function CreatorScreen() {
     if (p.status === 'qr') {
       return (
         <ScrollView contentContainerStyle={styles.scroll}>
-          <StepHeader step={3} title="Escanea y paga $0.01 MXN" subtitle="Abre tu app bancaria y autoriza el cobro." />
+          <StepHeader step={3} title={`Escanea y paga ${amountLabel}`} subtitle="Abre tu app bancaria y autoriza el cobro." />
           <Card style={styles.cardSection}>
             {/* En RN mostramos el QR como imagen base64 con expo-image o Image */}
-            <Image source={{ uri: p.qr.qrImage }} style={{ width: 240, height: 240, alignSelf: 'center' }} resizeMode="contain" accessibilityLabel="QR CoDi para pagar un centavo" />
+            <Image source={{ uri: p.qr.qrImage }} style={{ width: 240, height: 240, alignSelf: 'center' }} resizeMode="contain" accessibilityLabel={`QR CoDi para pagar ${amountLabel}`} />
             <Text style={styles.payText}>QR generado. Escanéalo con tu app bancaria.</Text>
             <Text style={styles.paySubText}>ID: {p.qr.id}</Text>
           </Card>
@@ -381,6 +404,9 @@ function StepHeader({ step, title, subtitle }: { step: number; title: string; su
 }
 
 const styles = StyleSheet.create({
+  amountOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 14 },
+  amountOption: { borderWidth: 1, borderColor: '#596b89', borderRadius: 12, padding: 12, backgroundColor: '#17243c' },
+  amountSelected: { borderColor: '#d1b6fc', backgroundColor: '#584272' },
   safe:   { flex: 1, backgroundColor: Colors.bg },
   scroll: { flexGrow: 1, paddingBottom: 32 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },

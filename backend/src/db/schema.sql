@@ -75,7 +75,7 @@ ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS purpose TEXT NOT NULL DEFA
 ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS pet_id TEXT;
 ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS trick TEXT;
 ALTER TABLE payment_receipts DROP CONSTRAINT IF EXISTS payment_receipts_amount_check;
-ALTER TABLE payment_receipts ADD CONSTRAINT payment_receipts_amount_check CHECK (amount >= 0.01 AND amount <= 1000);
+ALTER TABLE payment_receipts ADD CONSTRAINT payment_receipts_amount_check CHECK (amount >= 0.01);
 CREATE TABLE IF NOT EXISTS pet_donations (
   id UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
   transaction_id TEXT PRIMARY KEY REFERENCES payment_receipts(transaction_id),
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS pet_donations (
 );
 CREATE INDEX IF NOT EXISTS pet_donations_pet_idx ON pet_donations(pet_id);
 
--- Cinco usos gratuitos por actividad y mascota; request_id hace seguros los reintentos.
+-- Tres actividades al día por tipo y mascota; request_id hace seguros los reintentos.
 CREATE TABLE IF NOT EXISTS pet_activities (
   pet_id TEXT NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
   request_id UUID NOT NULL,
@@ -94,3 +94,4 @@ CREATE TABLE IF NOT EXISTS pet_activities (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (pet_id, request_id)
 );
+CREATE INDEX IF NOT EXISTS pet_activities_day_idx ON pet_activities(pet_id, created_at);

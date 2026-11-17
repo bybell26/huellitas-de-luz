@@ -13,16 +13,28 @@ const VALID_BREEDS = {
 };
 const VALID_COLLARS = ['#a77fff', '#6fe1cf', '#ff8b88', '#73a7fc', '#ffc96d', '#33435c'];
 const ACTIVITIES = ['feed', 'play', 'bath', 'style'];
-async function activityBalance(db, petId) {
-  const result = await db.query('SELECT action, count(*)::int AS used FROM pet_activities WHERE pet_id = $1 GROUP BY action', [petId]);
-  return Object.fromEntries(ACTIVITIES.map(action => [action, Math.max(0, 5 - (result.rows.find(row => row.action === action)?.used || 0))]));
+const DAILY_LIMIT = 3;
+const ACTIVITY_TIME_ZONE = 'America/Mexico_City';
+async function activityDay(db) {
+  const result = await db.query(`WITH moment AS (SELECT clock_timestamp() AS at),
+    day AS (SELECT at, (at AT TIME ZONE $1)::date AS date FROM moment)
+    SELECT at AS "recordedAt", date::text AS date,
+      date::timestamp AT TIME ZONE $1 AS "startsAt",
+      (date + 1)::timestamp AT TIME ZONE $1 AS "resetsAt" FROM day`, [ACTIVITY_TIME_ZONE]);
+  return result.rows[0];
 }
+async function activityBalance(db, petId, day) {
+  const result = await db.query('SELECT action, count(*)::int AS used FROM pet_activities WHERE pet_id = $1 AND created_at >= $2 AND created_at < $3 GROUP BY action', [petId, day.startsAt, day.resetsAt]);
+  return Object.fromEntries(ACTIVITIES.map(action => [action, Math.max(0, DAILY_LIMIT - (result.rows.find(row => row.action === action)?.used || 0))]));
+}
+function activityInfo(day) { return { limit: DAILY_LIMIT, timeZone: ACTIVITY_TIME_ZONE, date: day.date, resetsAt: day.resetsAt }; }
 
 router.get('/:id/activities', requireAuth, async (req, res) => {
   try {
     const pet = await pool.query('SELECT id FROM pets WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     if (!pet.rowCount) return res.status(404).json({ error: 'Mascota no encontrada.' });
-    return res.json({ remaining: await activityBalance(pool, req.params.id) });
+    const day = await activityDay(pool);
+    return res.json({ remaining: await activityBalance(pool, req.params.id, day), ...activityInfo(day) });
   } catch (err) {
     console.error('[pets/activities]', err.message);
     return res.status(500).json({ error: 'No se pudieron cargar las actividades.' });
@@ -44,27 +56,28 @@ router.post('/:id/activities', requireAuth, async (req, res) => {
     const found = await client.query('SELECT id, species, breed, collar, name, appearance FROM pets WHERE id = $1 AND user_id = $2 FOR UPDATE', [req.params.id, req.user.id]);
     if (!found.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Mascota no encontrada.' }); }
     let pet = found.rows[0];
+    const day = await activityDay(client);
     const previous = await client.query('SELECT action FROM pet_activities WHERE pet_id = $1 AND request_id = $2', [pet.id, requestId]);
     if (previous.rowCount && previous.rows[0].action !== action) {
       await client.query('ROLLBACK');
       return res.status(409).json({ error: 'El identificador ya corresponde a otra actividad.' });
     }
     if (!previous.rowCount) {
-      const remaining = await activityBalance(client, pet.id);
+      const remaining = await activityBalance(client, pet.id, day);
       if (!remaining[action]) {
         await client.query('ROLLBACK');
-        return res.status(409).json({ error: 'Agotaste los 5 usos gratuitos. El precio aún está por definir.', remaining });
+        return res.status(409).json({ error: 'Esta mascota ya completó esta actividad 3 veces hoy. Vuelve mañana; el límite se renueva a medianoche de Ciudad de México.', remaining, ...activityInfo(day) });
       }
       if (action === 'style') {
         const same = collar === pet.collar && Object.keys({ ...pet.appearance, ...appearance }).every(key => (pet.appearance[key] || 'breed') === (appearance[key] || 'breed'));
         if (same) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Elige un estilo diferente antes de guardar.' }); }
         pet = (await client.query('UPDATE pets SET appearance = $2::jsonb, collar = $3 WHERE id = $1 RETURNING id, species, breed, collar, name, appearance', [pet.id, JSON.stringify(appearance), collar])).rows[0];
       }
-      await client.query('INSERT INTO pet_activities (pet_id, request_id, action) VALUES ($1, $2, $3)', [pet.id, requestId, action]);
+      await client.query('INSERT INTO pet_activities (pet_id, request_id, action, created_at) VALUES ($1, $2, $3, $4)', [pet.id, requestId, action, day.recordedAt]);
     }
-    const remaining = await activityBalance(client, pet.id);
+    const remaining = await activityBalance(client, pet.id, day);
     await client.query('COMMIT');
-    return res.json({ pet, remaining, action, duplicate: !!previous.rowCount });
+    return res.json({ pet, remaining, action, duplicate: !!previous.rowCount, ...activityInfo(day) });
   } catch (err) {
     if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('[pets/activity]', err.message);

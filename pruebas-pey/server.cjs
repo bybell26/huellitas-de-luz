@@ -43,7 +43,7 @@ function createServer(fetchPey = fetch, getToken = async () => process.env.PEY_A
       if (req.method === 'GET' && url.pathname === '/payment-flow.js') return reply(200, await fs.readFile(path.join(__dirname, '../js/payment-flow.js'), 'utf8'), 'text/javascript; charset=utf-8');
       if (staticRoot) {
         const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-        const allowed = /^(?:index\.html|display\.html|login\.html|hogar\.html|manifest\.json|sw\.js|(?:js|css)\/[A-Za-z0-9_-]+\.(?:js|css)|assets\/[A-Za-z0-9_/-]+\.(?:png|svg))$/.test(file);
+        const allowed = /^(?:index\.html|display\.html|login\.html|hogar\.html|actividad\.html|manifest\.json|sw\.js|(?:js|css)\/[A-Za-z0-9_-]+\.(?:js|css)|assets\/[A-Za-z0-9_/-]+\.(?:png|svg))$/.test(file);
         if (req.method !== 'GET' || !allowed) return reply(404, {error: 'No encontrado.'});
         const type = file.endsWith('.html') ? 'text/html; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.png') ? 'image/png' : file.endsWith('.svg') ? 'image/svg+xml' : file.endsWith('.json') ? 'application/json; charset=utf-8' : 'text/javascript; charset=utf-8';
         const content = await fs.readFile(path.join(staticRoot, file));

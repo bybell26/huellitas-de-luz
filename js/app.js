@@ -15,7 +15,7 @@ const user          = getUser();
 
 const state = {
   species: null, breed: null, collar: COLORS[0].value, appearance: {},
-  name: '', step: 'create', busy: false,
+  name: '', step: 'create', busy: false, amount: 50, amountChoice: '50', customAmount: '',
   lastSentId: null, lastReceivedId: null,
 };
 
@@ -192,7 +192,7 @@ function renderCreate() {
     </div>
     ${PetAppearance.controls(state.appearance)}
     <button id="continue" class="button button-primary button-wide" type="button" ${complete ? '' : 'disabled'}>${actionContent(full ? 'Constelación completa' : 'Revisar mi mascota', 'arrow', full ? '42 de 42 mascotas' : complete ? 'Tu compañero está listo para el siguiente paso' : 'Elige un animal y una raza para continuar')}</button>
-    <p class="field-note">${full ? 'Retira una mascota para crear otra.' : 'Confirma el diseño y paga $0.01 MXN para enviarla a la constelación.'}</p>`;
+    <p class="field-note">${full ? 'Retira una mascota para crear otra.' : 'Revisa el diseño y elige tu aportación desde $50 MXN para enviarla a la constelación.'}</p>`;
 
   formRegion.querySelectorAll('[data-species]').forEach(btn =>
     btn.addEventListener('click', () => {
@@ -229,12 +229,34 @@ function reviewMarkup() {
 function renderReview() {
   formRegion.innerHTML = header('Confirma tu mascota', 'Revisa el diseño antes de pagar.', 2)
     + reviewMarkup()
-    + '<p class="confirm-text">El siguiente paso es pagar $0.01 MXN con QR. Tu mascota aparecerá en la constelación cuando Pey apruebe el cobro.</p>'
-    + '<div class="form-actions"><button class="button button-outline" id="edit">Editar</button><button class="button button-primary" id="confirm">Confirmar y pagar $0.01</button></div>';
+    + `<fieldset class="creation-amounts"><legend>Elige tu aportación · MXN</legend><div class="amount-buttons">${CreationPricing.presets.map(amount => `<button type="button" data-creation-amount="${amount}" aria-pressed="${state.amountChoice === String(amount)}">$${amount}</button>`).join('')}<button type="button" data-creation-amount="custom" aria-pressed="${state.amountChoice === 'custom'}">Otra cantidad</button></div><div id="custom-amount-wrap" ${state.amountChoice === 'custom' ? '' : 'hidden'}><label for="creation-custom-amount">Otra cantidad (mayor a $200 MXN)</label><input id="creation-custom-amount" type="number" inputmode="decimal" min="200.01" max="9999999999.99" step="0.01" placeholder="Ej. 250.00" value="${escapeText(state.customAmount)}" aria-describedby="creation-amount-error"></div><p id="creation-amount-error" class="amount-error" role="status"></p></fieldset>`
+    + '<p class="confirm-text">Tu mascota aparecerá en la constelación cuando Pey confirme el pago por el monto elegido.</p>'
+    + '<div class="form-actions"><button class="button button-outline" id="edit">Editar</button><button class="button button-primary" id="confirm">Confirmar y pagar</button></div>';
 
   document.getElementById('edit').addEventListener('click', () => { state.step = 'create'; render(); });
-  document.getElementById('confirm').innerHTML = actionContent('Confirmar y pagar', 'qr', '$0.01 MXN · Pago con CoDi');
+  document.querySelectorAll('[data-creation-amount]').forEach(button => button.addEventListener('click', () => {
+    state.amountChoice = button.dataset.creationAmount;
+    document.querySelectorAll('[data-creation-amount]').forEach(option => option.setAttribute('aria-pressed', String(option === button)));
+    document.getElementById('custom-amount-wrap').hidden = state.amountChoice !== 'custom';
+    updateCreationAmount();
+    if (state.amountChoice === 'custom') document.getElementById('creation-custom-amount').focus();
+  }));
+  document.getElementById('creation-custom-amount').addEventListener('input', event => { state.customAmount = event.target.value; updateCreationAmount(); });
+  updateCreationAmount();
   document.getElementById('confirm').addEventListener('click', beginPayment);
+}
+
+function creationAmount() { return state.amountChoice === 'custom' ? Number(state.customAmount) : Number(state.amountChoice); }
+function formatCreationAmount(amount = state.amount) { return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount) + ' MXN'; }
+function updateCreationAmount() {
+  const amount = creationAmount();
+  const valid = CreationPricing.creationCents(amount) !== null && (state.amountChoice !== 'custom' || amount > 200);
+  const error = document.getElementById('creation-amount-error');
+  error.textContent = valid ? '' : 'Ingresa una cantidad mayor a $200 MXN, con hasta dos decimales.';
+  document.getElementById('creation-custom-amount').setAttribute('aria-invalid', String(state.amountChoice === 'custom' && !valid));
+  const confirm = document.getElementById('confirm');
+  confirm.disabled = !valid;
+  confirm.innerHTML = actionContent('Confirmar y pagar', 'qr', valid ? `${formatCreationAmount(amount)} · Pago con CoDi` : 'Elige un monto válido');
 }
 
 // ─── Paso 3: Pago ─────────────────────────────────────────────────────────────
@@ -243,6 +265,8 @@ let paymentResult = null;
 
 function beginPayment() {
   if (state.busy) return;
+  const amount = creationAmount();
+  if (CreationPricing.creationCents(amount) === null || (state.amountChoice === 'custom' && amount <= 200)) { notify('Elige un monto válido antes de pagar.'); return; }
   if (!activeRoom) { notify('La sala todavía no está lista. Reintenta la conexión antes de pagar.'); return; }
   if (readRoster().length >= MAX_PETS) {
     notify('La constelación está llena. Retira una mascota antes de pagar.');
@@ -251,7 +275,8 @@ function beginPayment() {
   paymentFlow?.dispose();
   state.busy = true;
   state.step = 'payment';
-  paymentFlow = createPaymentFlow(updatePayment);
+  state.amount = amount;
+  paymentFlow = createPaymentFlow(updatePayment, { amount, createBody: { amount, purpose: 'creation' } });
   paymentFlow.start();
 }
 
@@ -271,21 +296,22 @@ function renderPayment() {
   const p = paymentResult || { status: 'creating' };
 
   if (p.status === 'creating') {
-    formRegion.innerHTML = header('Preparando tu cobro', 'Pago de $0.01 MXN', 3)
+    formRegion.innerHTML = header('Preparando tu cobro', `Pago de ${formatCreationAmount()}`, 3)
       + '<div class="payment-spinner"></div><p>Generando tu QR...</p>';
     return;
   }
   if (p.status === 'qr') {
-    formRegion.innerHTML = header('Escanea y paga $0.01 MXN', 'Abre tu app bancaria y autoriza el cobro.', 3)
-      + '<div class="payment-center"><img class="payment-qr" id="payment-qr" alt="QR CoDi de cobro por un centavo"><p>Después de pagar, pulsa el botón para validar.</p><button class="button button-primary" id="validate-payment">Ya pagué, validar cobro</button></div>';
+    formRegion.innerHTML = header(`Escanea y paga ${formatCreationAmount()}`, 'Abre tu app bancaria y autoriza el cobro.', 3)
+      + '<div class="payment-center"><img class="payment-qr" id="payment-qr" alt="QR CoDi por el monto elegido"><p>Después de pagar, pulsa el botón para validar.</p><button class="button button-primary" id="validate-payment">Ya pagué, validar cobro</button></div>';
     document.getElementById('payment-qr').src = p.qr.qrImage;
+    document.getElementById('payment-qr').alt = `QR CoDi de cobro por ${formatCreationAmount()}`;
     document.getElementById('validate-payment').innerHTML = actionContent('Ya pagué, validar cobro', 'check', 'Confirmaremos tu pago con Pey');
     document.getElementById('validate-payment').addEventListener('click', () => paymentFlow.validate());
     return;
   }
   if (p.status === 'waiting') {
     formRegion.innerHTML = header('Validando tu pago', 'Esperando la confirmación de Pey.', 3)
-      + `<div class="payment-center"><div class="payment-spinner"></div><h2>Confirmando $0.01 MXN</h2><p>Tiempo máximo: 2 minutos.</p><p>${escapeText(p.message || 'Consultando el estado del pago...')}</p></div>`;
+      + `<div class="payment-center"><div class="payment-spinner"></div><h2>Confirmando ${formatCreationAmount()}</h2><p>Tiempo máximo: 2 minutos.</p><p>${escapeText(p.message || 'Consultando el estado del pago...')}</p></div>`;
     return;
   }
   formRegion.innerHTML = header(p.status === 'rejected' ? 'Cobro rechazado' : 'No se pudo preparar el cobro', 'La mascota no se envió a la constelación.', 3)
@@ -299,7 +325,7 @@ function renderPayment() {
 
 // ─── Envío tras pago ──────────────────────────────────────────────────────────
 async function startSending(transaction) {
-  if (!transaction || transaction.status !== 'PAID' || Number(transaction.amount) !== 0.01) return;
+  if (!transaction || transaction.status !== 'PAID' || Number(transaction.amount) !== state.amount) return;
   if (!state.species || !state.breed) return;
 
   const petData = {

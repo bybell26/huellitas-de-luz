@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090d1d">
+  <title>Un ratito juntos · Huellitas de Luz</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/pet-motion.css">
+  <link rel="stylesheet" href="css/pet-activities.css">
+  <link rel="stylesheet" href="css/actividad.css">
+  <script src="js/auth.js"></script>
+  <script>requireSession();</script>
+  <script src="js/api.js" defer></script>
+  <script src="js/pets.js" defer></script>
+  <script src="js/pet-appearance.js" defer></script>
+  <script src="js/pets-motion.js" defer></script>
+  <script src="js/pet-activities.js" defer></script>
+  <script src="js/actividad.js" defer></script>
+</head>
+<body class="activity-page">
+  <div class="activity-wrap">
+    <header class="activity-header"><a class="brand" href="hogar.html"><span class="brand-icon">✦</span><span>huellitas <span class="brand-light">de luz</span><small>UN RATITO JUNTOS</small></span></a><a class="button button-ghost" href="hogar.html">← Volver a Hogar</a></header>
+    <main>
+      <div class="activity-heading"><div><p class="activity-eyebrow" id="activity-place">PREPARANDO TU ESPACIO</p><h1 id="activity-title">Todo listo para compartir.</h1><p id="activity-subtitle">Un momento especial con tu mascota.</p></div><span class="activity-balance" id="activity-balance">Cargando…</span></div>
+      <div class="activity-layout">
+        <section class="care-stage activity-scene" id="activity-scene" aria-label="Escenario de la actividad">
+          <div class="activity-decor" id="activity-decor" aria-hidden="true"></div>
+          <div id="care-avatar"></div><span id="care-effect" aria-hidden="true"></span>
+        </section>
+        <aside class="activity-controls" aria-label="Controles de la actividad">
+          <p class="activity-eyebrow">TIEMPO DE COMPARTIR</p>
+          <h2 id="activity-pet">Tu mascota</h2>
+          <p id="care-status" role="status" aria-live="polite">Cargando a tu compañero…</p>
+          <div id="care-game" class="care-game" hidden></div>
+          <form id="activity-style" hidden><div id="style-fields"></div><label>Color de collar<select id="style-collar"></select></label><button class="button button-primary" type="submit">Guardar estilo · 1 sesión de hoy</button></form>
+          <div id="activity-result"></div>
+          <p class="activity-note">Máximo 3 sesiones al día de cada actividad por mascota. Se renuevan a medianoche de Ciudad de México. Salir antes de terminar no consume una sesión.</p>
+        </aside>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

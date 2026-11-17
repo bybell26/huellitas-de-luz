@@ -28,6 +28,7 @@ export interface Transaction {
 
 interface PaymentFlowOptions {
   now?: () => number;
+  amount?: number;
 }
 
 export interface PaymentFlow {
@@ -41,6 +42,7 @@ export function createPaymentFlow(
   options: PaymentFlowOptions = {},
 ): PaymentFlow {
   const now = options.now ?? Date.now;
+  const expectedAmount = options.amount ?? 50;
 
   let qr:       QRData | null = null;
   let deadline  = 0;
@@ -109,7 +111,7 @@ export function createPaymentFlow(
         if (now() >= deadline) return reject();
 
         const paid = (data.items ?? []).find(
-          (item: any) => item.status === 'PAID' && Number(item.amount) === 0.01 && (!item.currency || item.currency === 'MXN'),
+          (item: any) => item.status === 'PAID' && Number(item.amount) === expectedAmount && (!item.currency || item.currency === 'MXN'),
         );
         if (paid) return finish({ status: 'paid', qr: qr!, transaction: paid });
 
@@ -141,7 +143,7 @@ export function createPaymentFlow(
       abortController = new AbortController();
       const createTimeout = setTimeout(() => abortController?.abort(), 30000);
       try {
-        const data = await request({ action: 'create' }, abortController.signal);
+        const data = await request({ action: 'create', amount: expectedAmount, purpose: 'creation' }, abortController.signal);
         if (finished) return;
         if (!data?.id || typeof data.qrImage !== 'string') throw new Error('QR sin imagen.');
         const image = data.qrImage.replace(/^data:image\/png;base64,/, '');

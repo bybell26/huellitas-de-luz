@@ -30,7 +30,9 @@ async function apiFetch(path, options = {}) {
     requireSession();
   }
   if (!response.ok) {
-    throw new Error(data.error || `Error ${response.status}`);
+    const error = new Error(data.error || `Error ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
   return data;
 }

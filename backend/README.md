@@ -93,6 +93,12 @@ Conectar: `ws://localhost:4000/ws?room=abc-1234&token=JWT`
 
 ## Recibos de pago
 
+Para crear una mascota, `POST /api/pey` con `action: create` requiere `amount`:
+$50, $100, $150 o $200 MXN, o una cantidad mayor a $200 con hasta dos decimales.
+El servidor registra ese importe y solo confirma un recibo PAID por el mismo
+monto en MXN. El monto de prueba de $0.01 ya no se acepta para nuevas creaciones.
+El laboratorio `pruebas-pey/` conserva sus cobros de prueba independientes.
+
 Después de actualizar, ejecuta `npm run migrate` para agregar `payment_requests` y
 `payment_receipts` sin borrar los datos existentes. Las consultas de cobros solo
 se permiten a la cuenta que creó el QR. `/api/pets` requiere un recibo aprobado
@@ -116,16 +122,18 @@ en `.env` ya no bloquea ese fallback. Reinicia el backend después de cambiar
 
 ## Actividades del hogar
 
-`GET /api/pets/:id/activities` devuelve los usos gratuitos restantes de la
+`GET /api/pets/:id/activities` devuelve las sesiones disponibles hoy de la
 mascota propia. `POST` en esa ruta recibe `action` (`feed`, `play`, `bath` o
-`style`) y un `requestId` UUID único. Cada mascota tiene cinco usos gratuitos
-por actividad, sin reinicio diario. El servidor conserva el saldo, comprueba
+`style`) y un `requestId` UUID único. Cada mascota puede completar tres sesiones
+de cada actividad al día, con renovación a medianoche de `America/Mexico_City`.
+La respuesta incluye `limit`, `date`, `timeZone` y `resetsAt`. El servidor conserva el historial, comprueba
 la propiedad y serializa solicitudes simultáneas; reintentar el mismo UUID no
-consume otro uso. Al agotarse responde 409: todavía no hay precio ni cobro.
+consume otra sesión, incluso si se reintenta una solicitud del día anterior.
+Al alcanzar el límite responde 409 y hay que esperar al día siguiente.
 
 `style` requiere `appearance` y `collar` válidos. Solo guardar un cambio real
 consume un uso; previsualizar o cancelar no lo consume. Ejecuta `npm run migrate`
-para agregar `pet_activities` y reinicia el backend después de actualizar.
+para agregar el índice diario de `pet_activities` y reinicia el backend después de actualizar.
 
 ## Donaciones adicionales (API)
 

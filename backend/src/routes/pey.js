@@ -3,6 +3,7 @@ import { getPeyKey } from '../services/pey-key.js';
 import pool from '../db/pool.js';
 import { TRICKS, donationCents, applyDonation } from '../services/donations.js';
 import { requireAuth } from '../middleware/auth.js';
+import pricing from '../../../js/creation-pricing.js';
 
 const router = Router();
 router.post('/', requireAuth, async (req, res) => {
@@ -16,6 +17,11 @@ router.post('/', requireAuth, async (req, res) => {
     let amount = .01, petId = null, trick = null;
     if (action === 'create') {
       if (!['creation', 'extra'].includes(purpose)) return res.status(400).json({error:'Tipo de donación inválido.'});
+      if (purpose === 'creation') {
+        const cents = pricing.creationCents(req.body.amount);
+        if (cents === null) return res.status(400).json({ error: 'Elige $50, $100, $150, $200 MXN u otra cantidad mayor a $200, con hasta dos decimales.' });
+        amount = cents / 100;
+      }
       if (purpose === 'extra') {
         const cents = donationCents(req.body.amount);
         if (cents === null) return res.status(400).json({error:'Elige un monto entre $0.01 y $1,000 MXN, con hasta dos decimales.'});
@@ -69,7 +75,7 @@ router.post('/', requireAuth, async (req, res) => {
     }
     if (upstream.ok && !creating) {
       for (const item of Array.isArray(data?.items) ? data.items : []) {
-        if (item.status !== 'PAID' || donationCents(Number(item.amount)) !== Math.round(Number(order.amount) * 100) || (item.currency && item.currency !== 'MXN') ||
+        if (item.status !== 'PAID' || pricing.moneyCents(Number(item.amount)) !== Math.round(Number(order.amount) * 100) || (item.currency && item.currency !== 'MXN') ||
             typeof item.id !== 'string' || !/^[A-Za-z0-9_-]+$/.test(item.id)) continue;
         await pool.query(
           "INSERT INTO payment_receipts (transaction_id, qr_id, user_id, amount, currency) VALUES ($1, $2, $3, $4, 'MXN') ON CONFLICT (transaction_id) DO NOTHING",

@@ -15,6 +15,7 @@ let admin, pool, server, wss, base, signToken, users;
 let qrSequence = 0, upstreamCalls = 0;
 let peyFailure = null;
 const transactions = new Map();
+const upstreamAmounts = new Map();
 const sockets = new Set();
 
 before(async () => {
@@ -43,7 +44,11 @@ before(async () => {
     if (String(url).startsWith('https://api.pey.mx/')) {
       upstreamCalls++;
       if (peyFailure) return Response.json(peyFailure.body,{status:peyFailure.status});
-      if (options.method === 'POST') return Response.json({ id: 'QR' + ++qrSequence, qrImage: 'YWJj' }, { status: 201 });
+      if (options.method === 'POST') {
+        const id = 'QR' + ++qrSequence;
+        upstreamAmounts.set(id, JSON.parse(options.body).amount);
+        return Response.json({ id, qrImage: 'YWJj' }, { status: 201 });
+      }
       const qr = new URL(url).pathname.split('/').at(-1);
       return Response.json({ items: transactions.get(qr) || [] });
     }
@@ -70,8 +75,8 @@ async function send(method, path, user, body) {
   return { status: response.status, body: await response.json() };
 }
 const pet = id => ({ id: 'pey-' + id, species: 'gato', breed: 'siames', collar: '#a77fff', name: 'Luna' });
-async function pay(user, tx, amount = 0.01, currency = 'MXN') {
-  const created = await send('POST','/api/pey',user,{ action:'create' });
+async function pay(user, tx, amount = 50, currency = 'MXN') {
+  const created = await send('POST','/api/pey',user,{ action:'create', amount: 50 });
   assert.equal(created.status,200);
   const qr = created.body.data.id;
   transactions.set(qr, [{id:tx,status:'PAID',amount,currency}]);
@@ -79,6 +84,29 @@ async function pay(user, tx, amount = 0.01, currency = 'MXN') {
   assert.equal(result.status,200);
   return qr;
 }
+
+test('creación cobra el monto elegido, rechaza cantidades inválidas y exige pago exacto', async () => {
+  const user = users[0];
+  for (const amount of [undefined, null, '50', .01, 0, 49.99, 75, 199.99, 200.001, 250.999]) {
+    const before = upstreamCalls;
+    assert.equal((await send('POST', '/api/pey', user, { action: 'create', amount })).status, 400);
+    assert.equal(upstreamCalls, before);
+  }
+  for (const [index, amount] of [50, 100, 150, 200, 200.01, 1250.25].entries()) {
+    const created = await send('POST', '/api/pey', user, { action: 'create', amount });
+    assert.equal(created.status, 200);
+    const qr = created.body.data.id;
+    assert.equal(upstreamAmounts.get(qr), amount);
+    const tx = 'PRICE_' + index;
+    transactions.set(qr, [{ id: tx, status: 'PAID', amount: amount - .01, currency: 'MXN' }]);
+    await send('POST', '/api/pey', user, { action: 'status', id: qr });
+    assert.equal((await send('POST', '/api/pets', user, pet(tx))).status, 403);
+    transactions.set(qr, [{ id: tx, status: 'PAID', amount, currency: 'MXN' }]);
+    await send('POST', '/api/pey', user, { action: 'status', id: qr });
+    assert.equal((await send('POST', '/api/pets', user, pet(tx))).status, 201);
+    assert.equal(Number((await pool.query('SELECT amount FROM payment_receipts WHERE transaction_id = $1', [tx])).rows[0].amount), amount);
+  }
+});
 
 test('registro, login y mascota pagada se sincronizan entre dos clientes', async () => {
   const account = { email: 'integration@test.example', password: 'Integration-123!', name: 'Integración' };
@@ -121,7 +149,7 @@ test('registro, login y mascota pagada se sincronizan entre dos clientes', async
   clients.forEach(socket => socket.close());
 });
 
-test('actividades: cinco usos por mascota, propiedad, concurrencia y estilo persistente', async () => {
+test('actividades: tres sesiones al día, propiedad, concurrencia y renovación por fecha de México', async () => {
   const [owner, other] = users;
   await pay(owner, 'CARE');
   const id = pet('CARE').id;
@@ -131,15 +159,19 @@ test('actividades: cinco usos por mascota, propiedad, concurrencia y estilo pers
   assert.equal((await send('GET', route, other)).status, 404);
   assert.equal((await send('POST', route, other, { action: 'feed', requestId: randomUUID() })).status, 404);
   assert.equal((await send('POST', route, owner, { action: 'invalid', requestId: randomUUID() })).status, 400);
-  assert.deepEqual((await send('GET', route, owner)).body.remaining, { feed: 5, play: 5, bath: 5, style: 5 });
+  const initial = (await send('GET', route, owner)).body;
+  assert.deepEqual(initial.remaining, { feed: 3, play: 3, bath: 3, style: 3 });
+  assert.equal(initial.limit, 3);
+  assert.equal(initial.timeZone, 'America/Mexico_City');
+  assert.ok(Number.isFinite(Date.parse(initial.resetsAt)));
   const request = { action: 'feed', requestId: randomUUID() };
   const results = await Promise.all(Array.from({ length: 3 }, () => send('POST', route, owner, request)));
-  assert.ok(results.every(result => result.status === 200 && result.body.remaining.feed === 4));
+  assert.ok(results.every(result => result.status === 200 && result.body.remaining.feed === 2));
   assert.equal((await send('POST', route, owner, { ...request, action: 'play' })).status, 409);
   const simultaneous = await Promise.all(Array.from({ length: 6 }, () => send('POST', route, owner, { action: 'play', requestId: randomUUID() })));
-  assert.equal(simultaneous.filter(result => result.status === 200).length, 5);
-  assert.equal(simultaneous.filter(result => result.status === 409).length, 1);
-  for (let i = 0; i < 5; i++) {
+  assert.equal(simultaneous.filter(result => result.status === 200).length, 3);
+  assert.equal(simultaneous.filter(result => result.status === 409).length, 3);
+  for (let i = 0; i < 3; i++) {
     assert.equal((await send('POST', route, owner, { action: 'bath', requestId: randomUUID() })).status, 200);
     assert.equal((await send('POST', route, owner, { action: 'style', requestId: randomUUID(), appearance: { fur: i % 2 ? 'cream' : 'gray' }, collar: '#73a7fc' })).status, 200);
   }
@@ -151,14 +183,26 @@ test('actividades: cinco usos por mascota, propiedad, concurrencia y estilo pers
   const pets = (await send('GET', '/api/pets', owner)).body.pets;
   assert.deepEqual(pets.find(item => item.id === id).appearance, { fur: 'gray' });
   assert.equal(pets.find(item => item.id === id).collar, '#73a7fc');
-  assert.deepEqual((await send('GET', route, owner)).body.remaining, { feed: 4, play: 0, bath: 0, style: 0 });
+  assert.deepEqual((await send('GET', route, owner)).body.remaining, { feed: 2, play: 0, bath: 0, style: 0 });
+  // Los registros del día anterior no reducen las sesiones de hoy.
+  await pool.query("UPDATE pet_activities SET created_at = (($2::date - 1)::timestamp + interval '12 hours') AT TIME ZONE 'America/Mexico_City' WHERE pet_id = $1", [id, initial.date]);
+  assert.deepEqual((await send('GET', route, owner)).body.remaining, { feed: 3, play: 3, bath: 3, style: 3 });
+  const replay = await send('POST', route, owner, request);
+  assert.equal(replay.body.duplicate, true);
+  assert.equal(replay.body.remaining.feed, 3, 'reintentar una sesión de ayer no consume una de hoy');
+  assert.equal((await send('POST', route, owner, { action: 'feed', requestId: randomUUID() })).body.remaining.feed, 2);
   // Una mascota nueva tiene su propio saldo y un estilo inválido no consume usos.
   await pay(owner, 'CARE2');
   await send('POST', '/api/pets', owner, pet('CARE2'));
   const second = '/api/pets/' + pet('CARE2').id + '/activities';
   assert.equal((await send('POST', second, owner, { action: 'style', requestId: randomUUID(), appearance: { fur: 'neon' }, collar: '#73a7fc' })).status, 400);
   assert.equal((await send('POST', second, owner, { action: 'style', requestId: randomUUID(), appearance: {}, collar: '#a77fff' })).status, 400);
-  assert.deepEqual((await send('GET', second, owner)).body.remaining, { feed: 5, play: 5, bath: 5, style: 5 });
+  assert.deepEqual((await send('GET', second, owner)).body.remaining, { feed: 3, play: 3, bath: 3, style: 3 });
+  // Medianoche pertenece al día nuevo; el instante anterior y el siguiente día no cuentan.
+  for (const offset of ["- interval '1 millisecond'", '', "+ interval '1 day'"]) {
+    await pool.query(`INSERT INTO pet_activities(pet_id, request_id, action, created_at) VALUES ($1,$2,'play', ($3::date::timestamp AT TIME ZONE 'America/Mexico_City') ${offset})`, [pet('CARE2').id, randomUUID(), initial.date]);
+  }
+  assert.equal((await send('GET', second, owner)).body.remaining.play, 2);
 });
 
 test('pago obligatorio, propiedad del QR, consumo único y reintento de mascota', async () => {
@@ -243,10 +287,10 @@ test('importe confirmado se conserva en sala y eventos, sin exponer el recibo', 
   assert.equal((await send('POST','/api/pets',a,pet('DONATION_DETAIL'))).status,201);
   const room=(await send('POST','/api/rooms',a,{name:'Detalles'})).body.room;
   const added=await send('POST','/api/rooms/'+room.code+'/pets',a,{petId:'pey-DONATION_DETAIL'});
-  assert.equal(added.body.pet.donation_amount,.01);
+  assert.equal(added.body.pet.donation_amount,50);
   assert.equal(added.body.pet.donation_currency,'MXN');
   const publicRoom=await send('GET','/api/rooms/'+room.code,null);
-  assert.equal(publicRoom.body.pets[0].donation_amount,.01);
+  assert.equal(publicRoom.body.pets[0].donation_amount,50);
   assert.equal(publicRoom.body.pets[0].donation_currency,'MXN');
   assert.equal(publicRoom.body.pets[0].transaction_id,undefined);
   assert.equal(publicRoom.body.pets[0].qr_id,undefined);
@@ -267,7 +311,7 @@ test('donación extra: monto exacto, total acumulado y un solo evento en reinten
  const room=(await send('POST','/api/rooms',users[0],{name:'Acumulado'})).body.room;
  await send('POST','/api/rooms/'+room.code+'/pets',users[0],{petId:target});
  const roster=await send('GET','/api/rooms/'+room.code,null);
- assert.equal(roster.body.pets[0].donation_amount,12.51);
+ assert.equal(roster.body.pets[0].donation_amount,62.5);
  assert.equal((await send('POST','/api/pets',donor,pet('EXTRA1'))).status,403,'no crear mascota con recibo extra');
  assert.equal((await send('POST','/api/pey',users[0],{action:'status',id:qr})).status,404);
  const altered=await send('POST','/api/pey',donor,{action:'create',purpose:'extra',petId:target,amount:5,trick:'stand'});
@@ -296,13 +340,13 @@ test('validación de montos, especie del truco y apariencia natural persistente'
 test('errores de Pey visibles sin cerrar la sesión del usuario ni filtrar la clave', async () => {
  try {
   peyFailure = { status:401, body:{error:{type:'UNAUTHORIZED',message:'secret test-key'}} };
-  const denied = await send('POST','/api/pey',users[0],{action:'create'});
+  const denied = await send('POST','/api/pey',users[0],{action:'create',amount:50});
   assert.equal(denied.status,502);
   assert.equal(denied.body.status,401);
   assert.match(denied.body.error,/API key/);
   assert.equal(JSON.stringify(denied.body).includes('test-key'),false);
   peyFailure = { status:400, body:{error:{type:'INVALID_STATE'}} };
-  const disabled = await send('POST','/api/pey',users[0],{action:'create'});
+  const disabled = await send('POST','/api/pey',users[0],{action:'create',amount:50});
   assert.equal(disabled.status,502);
   assert.match(disabled.body.error,/CoDi no está habilitado/);
  } finally { peyFailure = null; }

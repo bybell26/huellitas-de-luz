@@ -1,10 +1,11 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const {createPaymentFlow} = require('./payment-flow.js');
-function harness(request) {
+function harness(request, options = {}) {
   let time = 0, id = 0;
   const tasks = new Map(), updates = [];
   const flow = createPaymentFlow(p => updates.push(p), {
+    ...options,
     request, now: () => time,
     schedule: (fn, delay) => {tasks.set(++id, {fn, at: time + delay});return id;},
     cancel: key => tasks.delete(key)
@@ -12,6 +13,23 @@ function harness(request) {
   return {flow, updates, advance(ms) {time += ms;for(const [key, task] of [...tasks])if(task.at <= time){tasks.delete(key);task.fn();}}};
 }
 const qr = {id: 'QR1', qrImage: 'aW1hZ2U='};
+
+test('el monto elegido se envía al QR y solo ese importe confirma el pago', async () => {
+  let paidAmount = 50;
+  const h = harness(async input => {
+    if (input.action === 'create') {
+      assert.equal(input.amount, 250.5);
+      return { ...qr };
+    }
+    return { items: [{ id: 'CUSTOM', status: 'PAID', amount: paidAmount, currency: 'MXN' }] };
+  }, { amount: 250.5, createBody: { amount: 250.5 } });
+  await h.flow.start(); h.flow.validate(); await new Promise(setImmediate);
+  assert.equal(h.updates.some(update => update.status === 'paid'), false);
+  paidAmount = 250.5;
+  h.advance(2000); await new Promise(setImmediate);
+  assert.equal(h.updates.at(-1).status, 'paid');
+  h.flow.dispose();
+});
 test('PAID confirma y detiene la validación', async () => {
   const h = harness(async input => input.action === 'create' ? {...qr} : {items: [{id: 'T1', amount: 0.01, status: 'PAID', currency: 'MXN'}]});
   await h.flow.start(); h.flow.validate(); await new Promise(setImmediate);

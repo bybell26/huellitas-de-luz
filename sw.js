@@ -7,15 +7,20 @@
  * - Fallback offline: sirve la última versión cacheada del shell.
  */
 
-const CACHE_NAME    = 'huellitas-v8-hogar-actividades';
+const CACHE_NAME    = 'huellitas-v15-limite-diario';
 
 const SHELL_URLS = [
   '/index.html',
   '/login.html',
   '/display.html',
   '/hogar.html',
+  '/actividad.html',
+  '/css/actividad.css',
+  '/js/actividad.js',
   '/css/hogar.css',
   '/js/hogar.js',
+  '/js/pet-activities.js',
+  '/css/pet-activities.css',
   '/css/global.css',
   '/css/creator.css',
   '/css/display.css',
@@ -27,6 +32,7 @@ const SHELL_URLS = [
   '/js/storage.js',
   '/js/ws.js',
   '/js/payment-flow.js',
+  '/js/creation-pricing.js',
   '/js/animations.js',
   '/js/pets-motion.js',
   '/js/pet-appearance.js',
